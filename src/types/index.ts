@@ -153,3 +153,22 @@ export const CURRENCIES = [
 ] as const;
 
 export type CurrencyCode = typeof CURRENCIES[number]['code'];
+
+// Monthly expense data for dashboard
+export interface CategoryBreakdown {
+  name: string;
+  amount: number;
+  percentage: number;
+  color: string;
+}
+
+export interface MonthlyExpenseData {
+  month: string;           // "2025-11"
+  monthLabel: string;      // "November 2025"
+  totalAmount: number;
+  budgetAmount: number;
+  budgetPercentage: number;
+  expenseCount: number;
+  expenses: Expense[];
+  categoryBreakdown: CategoryBreakdown[];
+}
