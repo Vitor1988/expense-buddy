@@ -44,3 +44,44 @@ export function getWeekRange(date: Date = new Date()): { start: Date; end: Date 
   end.setDate(start.getDate() + 6)
   return { start, end }
 }
+
+// Get month key in YYYY-MM format
+export function getMonthKey(date: Date = new Date()): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  return `${year}-${month}`
+}
+
+// Format month for display (e.g., "November 2025")
+export function formatMonthYear(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date + '-01') : date
+  return new Intl.DateTimeFormat('en-US', {
+    year: 'numeric',
+    month: 'long',
+  }).format(d)
+}
+
+// Get list of month keys for the past N months
+export function getPastMonthKeys(count: number): string[] {
+  const months: string[] = []
+  const now = new Date()
+
+  for (let i = 0; i < count; i++) {
+    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+    months.push(getMonthKey(date))
+  }
+
+  return months
+}
+
+// Parse month key to get start and end dates
+export function getMonthDateRange(monthKey: string): { start: string; end: string } {
+  const [year, month] = monthKey.split('-').map(Number)
+  const start = new Date(year, month - 1, 1)
+  const end = new Date(year, month, 0) // Last day of month
+
+  return {
+    start: start.toISOString().split('T')[0],
+    end: end.toISOString().split('T')[0],
+  }
+}

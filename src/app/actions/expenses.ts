@@ -3,6 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import { formatMonthYear, getMonthDateRange, getPastMonthKeys } from '@/lib/utils';
+import type { MonthlyExpenseData, CategoryBreakdown, Expense } from '@/types';
 
 export async function createExpense(formData: FormData) {
   const supabase = await createClient();
@@ -184,4 +186,197 @@ export async function getExpenseById(id: string) {
     .single();
 
   return { data, error: error?.message };
+}
+
+export async function getExpensesByMonth(monthCount: number = 3): Promise<{
+  data: MonthlyExpenseData[] | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { data: null, error: 'Not authenticated' };
+  }
+
+  // Get month keys for the past N months
+  const monthKeys = getPastMonthKeys(monthCount);
+
+  // Get date range for all months
+  const oldestMonth = monthKeys[monthKeys.length - 1];
+  const { start: startDate } = getMonthDateRange(oldestMonth);
+
+  // Fetch all expenses for the date range
+  const { data: expenses, error: expensesError } = await supabase
+    .from('expenses')
+    .select('*, category:categories(*)')
+    .eq('user_id', user.id)
+    .gte('date', startDate)
+    .order('date', { ascending: false });
+
+  if (expensesError) {
+    return { data: null, error: expensesError.message };
+  }
+
+  // Fetch monthly budgets
+  const { data: budgets } = await supabase
+    .from('budgets')
+    .select('amount')
+    .eq('user_id', user.id)
+    .eq('period', 'monthly');
+
+  const totalBudget = budgets?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
+
+  // Group expenses by month
+  const monthlyData: MonthlyExpenseData[] = monthKeys.map((monthKey) => {
+    const { start, end } = getMonthDateRange(monthKey);
+
+    // Filter expenses for this month
+    const monthExpenses = (expenses || []).filter((exp) => {
+      return exp.date >= start && exp.date <= end;
+    }) as Expense[];
+
+    // Calculate totals
+    const totalAmount = monthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+    const budgetPercentage = totalBudget > 0 ? Math.round((totalAmount / totalBudget) * 100) : 0;
+
+    // Calculate category breakdown
+    const categoryMap = new Map<string, { amount: number; color: string }>();
+    monthExpenses.forEach((exp) => {
+      const cat = exp.category as { name: string; color: string | null } | null;
+      const catName = cat?.name || 'Uncategorized';
+      const catColor = cat?.color || '#6b7280';
+
+      const existing = categoryMap.get(catName) || { amount: 0, color: catColor };
+      categoryMap.set(catName, {
+        amount: existing.amount + Number(exp.amount),
+        color: catColor,
+      });
+    });
+
+    const categoryBreakdown: CategoryBreakdown[] = Array.from(categoryMap.entries())
+      .map(([name, { amount, color }]) => ({
+        name,
+        amount,
+        percentage: totalAmount > 0 ? Math.round((amount / totalAmount) * 100) : 0,
+        color,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5); // Top 5 categories
+
+    return {
+      month: monthKey,
+      monthLabel: formatMonthYear(monthKey),
+      totalAmount,
+      budgetAmount: totalBudget,
+      budgetPercentage,
+      expenseCount: monthExpenses.length,
+      expenses: monthExpenses,
+      categoryBreakdown,
+    };
+  });
+
+  return { data: monthlyData, error: null };
+}
+
+export async function loadMoreMonths(offset: number, count: number = 3): Promise<{
+  data: MonthlyExpenseData[] | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { data: null, error: 'Not authenticated' };
+  }
+
+  // Get month keys starting from offset
+  const allMonthKeys = getPastMonthKeys(offset + count);
+  const monthKeys = allMonthKeys.slice(offset);
+
+  if (monthKeys.length === 0) {
+    return { data: [], error: null };
+  }
+
+  // Get date range for these months
+  const oldestMonth = monthKeys[monthKeys.length - 1];
+  const newestMonth = monthKeys[0];
+  const { start: startDate } = getMonthDateRange(oldestMonth);
+  const { end: endDate } = getMonthDateRange(newestMonth);
+
+  // Fetch expenses for the date range
+  const { data: expenses, error: expensesError } = await supabase
+    .from('expenses')
+    .select('*, category:categories(*)')
+    .eq('user_id', user.id)
+    .gte('date', startDate)
+    .lte('date', endDate)
+    .order('date', { ascending: false });
+
+  if (expensesError) {
+    return { data: null, error: expensesError.message };
+  }
+
+  // Fetch monthly budgets
+  const { data: budgets } = await supabase
+    .from('budgets')
+    .select('amount')
+    .eq('user_id', user.id)
+    .eq('period', 'monthly');
+
+  const totalBudget = budgets?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
+
+  // Group expenses by month (same logic as above)
+  const monthlyData: MonthlyExpenseData[] = monthKeys.map((monthKey) => {
+    const { start, end } = getMonthDateRange(monthKey);
+
+    const monthExpenses = (expenses || []).filter((exp) => {
+      return exp.date >= start && exp.date <= end;
+    }) as Expense[];
+
+    const totalAmount = monthExpenses.reduce((sum, exp) => sum + Number(exp.amount), 0);
+    const budgetPercentage = totalBudget > 0 ? Math.round((totalAmount / totalBudget) * 100) : 0;
+
+    const categoryMap = new Map<string, { amount: number; color: string }>();
+    monthExpenses.forEach((exp) => {
+      const cat = exp.category as { name: string; color: string | null } | null;
+      const catName = cat?.name || 'Uncategorized';
+      const catColor = cat?.color || '#6b7280';
+
+      const existing = categoryMap.get(catName) || { amount: 0, color: catColor };
+      categoryMap.set(catName, {
+        amount: existing.amount + Number(exp.amount),
+        color: catColor,
+      });
+    });
+
+    const categoryBreakdown: CategoryBreakdown[] = Array.from(categoryMap.entries())
+      .map(([name, { amount, color }]) => ({
+        name,
+        amount,
+        percentage: totalAmount > 0 ? Math.round((amount / totalAmount) * 100) : 0,
+        color,
+      }))
+      .sort((a, b) => b.amount - a.amount)
+      .slice(0, 5);
+
+    return {
+      month: monthKey,
+      monthLabel: formatMonthYear(monthKey),
+      totalAmount,
+      budgetAmount: totalBudget,
+      budgetPercentage,
+      expenseCount: monthExpenses.length,
+      expenses: monthExpenses,
+      categoryBreakdown,
+    };
+  });
+
+  return { data: monthlyData, error: null };
 }

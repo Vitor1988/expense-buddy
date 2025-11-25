@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import {
@@ -9,6 +9,9 @@ import {
   PiggyBank,
   Plus,
 } from 'lucide-react';
+import { MonthlyExpenseSection } from '@/components/dashboard/monthly-expense-section';
+import { getExpensesByMonth } from '@/app/actions/expenses';
+import type { CurrencyCode } from '@/types';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -24,14 +27,14 @@ export default async function DashboardPage() {
     .eq('id', user?.id)
     .single();
 
-  // Get this month's expenses
+  // Get this month's expenses for stat cards
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
   const { data: expenses } = await supabase
     .from('expenses')
-    .select('amount, category:categories(name, color)')
+    .select('amount')
     .eq('user_id', user?.id)
     .gte('date', startOfMonth.toISOString().split('T')[0]);
 
@@ -46,15 +49,10 @@ export default async function DashboardPage() {
 
   const totalBudget = budgets?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
 
-  // Get recent expenses
-  const { data: recentExpenses } = await supabase
-    .from('expenses')
-    .select('id, amount, description, date, category:categories(name, color, icon)')
-    .eq('user_id', user?.id)
-    .order('date', { ascending: false })
-    .limit(5);
+  // Get monthly expense data for the collapsible section
+  const { data: monthlyData } = await getExpensesByMonth(3);
 
-  const currency = profile?.currency || 'USD';
+  const currency = (profile?.currency || 'USD') as CurrencyCode;
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -71,7 +69,7 @@ export default async function DashboardPage() {
             Welcome back, {user?.user_metadata?.full_name?.split(' ')[0] || 'there'}!
           </h1>
           <p className="text-gray-600 dark:text-gray-400">
-            Here&apos;s your financial overview for this month
+            Here&apos;s your financial overview
           </p>
         </div>
         <Link href="/expenses/new">
@@ -172,73 +170,11 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Expenses */}
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Recent Expenses</CardTitle>
-          <Link href="/expenses">
-            <Button variant="ghost" size="sm">
-              View all
-            </Button>
-          </Link>
-        </CardHeader>
-        <CardContent>
-          {recentExpenses && recentExpenses.length > 0 ? (
-            <div className="space-y-4">
-              {recentExpenses.map((expense) => {
-                const category = expense.category as unknown as { name: string; color: string; icon: string } | null;
-                return (
-                  <div
-                    key={expense.id}
-                    className="flex items-center justify-between py-2"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-full flex items-center justify-center"
-                        style={{
-                          backgroundColor: category?.color ? category.color + '20' : '#6b728020',
-                        }}
-                      >
-                        <span
-                          className="text-lg"
-                          style={{
-                            color: category?.color || '#6b7280',
-                          }}
-                        >
-                          $
-                        </span>
-                      </div>
-                      <div>
-                        <p className="font-medium text-gray-900 dark:text-white">
-                          {expense.description || 'Expense'}
-                        </p>
-                        <p className="text-sm text-gray-500">
-                          {category?.name || 'Uncategorized'} • {new Date(expense.date).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="font-semibold text-gray-900 dark:text-white">
-                      -{formatter.format(expense.amount)}
-                    </p>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="text-center py-8">
-              <p className="text-gray-500 dark:text-gray-400 mb-4">
-                No expenses yet. Start tracking your spending!
-              </p>
-              <Link href="/expenses/new">
-                <Button className="bg-emerald-500 hover:bg-emerald-600">
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Your First Expense
-                </Button>
-              </Link>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+      {/* Monthly Expenses Section */}
+      <MonthlyExpenseSection
+        initialData={monthlyData || []}
+        currency={currency}
+      />
     </div>
   );
 }
