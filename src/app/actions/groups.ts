@@ -715,7 +715,7 @@ export async function getInvitationByToken(token: string): Promise<{
 
   const { data, error } = await supabase
     .from('group_invitations')
-    .select('id, group_id, invited_email, status, expires_at, group:expense_groups(name, description), inviter:profiles!group_invitations_invited_by_fkey(full_name)')
+    .select('id, group_id, invited_email, status, expires_at, group:expense_groups(name, description), inviter:profiles!group_invitations_invited_by_profiles_fkey(full_name)')
     .eq('token', token)
     .single();
 
@@ -966,7 +966,7 @@ export async function getMyPendingInvitations(): Promise<{
 
   const { data, error } = await supabase
     .from('group_invitations')
-    .select('id, token, created_at, group:expense_groups(id, name), inviter:profiles!group_invitations_invited_by_fkey(full_name)')
+    .select('id, token, created_at, group:expense_groups(id, name), inviter:profiles!group_invitations_invited_by_profiles_fkey(full_name)')
     .eq('invited_email', user.email.toLowerCase())
     .eq('status', 'pending')
     .gt('expires_at', new Date().toISOString())
