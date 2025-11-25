@@ -52,21 +52,64 @@ export async function createRecurringExpense(formData: FormData) {
     return { error: 'Please select the next date' };
   }
 
-  const { error } = await supabase.from('recurring_expenses').insert({
-    user_id: user.id,
-    amount,
-    description: description || null,
-    category_id: category_id || null,
-    frequency,
-    next_date,
-    is_active: true,
-  });
+  const { data: inserted, error } = await supabase
+    .from('recurring_expenses')
+    .insert({
+      user_id: user.id,
+      amount,
+      description: description || null,
+      category_id: category_id || null,
+      frequency,
+      next_date,
+      is_active: true,
+    })
+    .select()
+    .single();
 
   if (error) {
     return { error: error.message };
   }
 
+  // If the start date is today or in the past, create the first expense immediately
+  const today = new Date().toISOString().split('T')[0];
+  if (next_date <= today) {
+    // Create the first expense entry
+    await supabase.from('expenses').insert({
+      user_id: user.id,
+      amount,
+      description: description || null,
+      category_id: category_id || null,
+      date: next_date,
+      recurring_id: inserted.id,
+      tags: [],
+    });
+
+    // Calculate and update the next occurrence date
+    const nextOccurrence = new Date(next_date);
+    switch (frequency) {
+      case 'daily':
+        nextOccurrence.setDate(nextOccurrence.getDate() + 1);
+        break;
+      case 'weekly':
+        nextOccurrence.setDate(nextOccurrence.getDate() + 7);
+        break;
+      case 'monthly':
+        nextOccurrence.setMonth(nextOccurrence.getMonth() + 1);
+        break;
+      case 'yearly':
+        nextOccurrence.setFullYear(nextOccurrence.getFullYear() + 1);
+        break;
+    }
+
+    await supabase
+      .from('recurring_expenses')
+      .update({ next_date: nextOccurrence.toISOString().split('T')[0] })
+      .eq('id', inserted.id);
+  }
+
   revalidatePath('/recurring');
+  revalidatePath('/dashboard');
+  revalidatePath('/expenses');
   return { success: true };
 }
 
