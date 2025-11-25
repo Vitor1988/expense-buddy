@@ -28,6 +28,7 @@ import {
   Repeat,
   Wallet,
   FolderOpen,
+  Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
@@ -45,6 +46,7 @@ interface HeaderProps {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/expenses', label: 'Expenses', icon: Receipt },
+  { href: '/groups', label: 'Groups', icon: Users },
   { href: '/categories', label: 'Categories', icon: FolderOpen },
   { href: '/budgets', label: 'Budgets', icon: PiggyBank },
   { href: '/recurring', label: 'Recurring', icon: Repeat },

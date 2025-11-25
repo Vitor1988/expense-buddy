@@ -6,16 +6,16 @@ import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
   Receipt,
-  PiggyBank,
   BarChart3,
   Plus,
+  Users,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
   { href: '/expenses', label: 'Expenses', icon: Receipt },
   { href: '/expenses/new', label: 'Add', icon: Plus, isAction: true },
-  { href: '/budgets', label: 'Budgets', icon: PiggyBank },
+  { href: '/groups', label: 'Groups', icon: Users },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
 ];
 

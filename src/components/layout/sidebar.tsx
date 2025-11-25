@@ -12,11 +12,13 @@ import {
   Repeat,
   Wallet,
   FolderOpen,
+  Users,
 } from 'lucide-react';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/expenses', label: 'Expenses', icon: Receipt },
+  { href: '/groups', label: 'Groups', icon: Users },
   { href: '/categories', label: 'Categories', icon: FolderOpen },
   { href: '/budgets', label: 'Budgets', icon: PiggyBank },
   { href: '/recurring', label: 'Recurring', icon: Repeat },
