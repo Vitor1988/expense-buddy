@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { signOut } from '@/app/actions/auth';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -25,9 +25,9 @@ import {
   Receipt,
   PiggyBank,
   BarChart3,
-  Users,
   Repeat,
   Wallet,
+  FolderOpen,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { usePathname } from 'next/navigation';
@@ -45,10 +45,10 @@ interface HeaderProps {
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/expenses', label: 'Expenses', icon: Receipt },
+  { href: '/categories', label: 'Categories', icon: FolderOpen },
   { href: '/budgets', label: 'Budgets', icon: PiggyBank },
   { href: '/recurring', label: 'Recurring', icon: Repeat },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/groups', label: 'Groups', icon: Users },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -56,8 +56,24 @@ export function Header({ user }: HeaderProps) {
   const [isDark, setIsDark] = useState(false);
   const pathname = usePathname();
 
+  // Load dark mode preference on mount
+  useEffect(() => {
+    const stored = localStorage.getItem('theme');
+    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+    const shouldBeDark = stored === 'dark' || (!stored && prefersDark);
+
+    setIsDark(shouldBeDark);
+    if (shouldBeDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, []);
+
   const toggleDark = () => {
-    setIsDark(!isDark);
+    const newDark = !isDark;
+    setIsDark(newDark);
+    localStorage.setItem('theme', newDark ? 'dark' : 'light');
     document.documentElement.classList.toggle('dark');
   };
 

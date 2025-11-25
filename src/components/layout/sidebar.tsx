@@ -9,7 +9,6 @@ import {
   PiggyBank,
   BarChart3,
   Settings,
-  Users,
   Repeat,
   Wallet,
   FolderOpen,
@@ -22,7 +21,6 @@ const navItems = [
   { href: '/budgets', label: 'Budgets', icon: PiggyBank },
   { href: '/recurring', label: 'Recurring', icon: Repeat },
   { href: '/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/groups', label: 'Groups', icon: Users },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -32,7 +30,7 @@ export function Sidebar() {
   return (
     <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-screen fixed left-0 top-0">
       {/* Logo */}
-      <div className="flex items-center gap-3 px-6 py-5 border-b border-gray-200 dark:border-gray-800">
+      <div className="flex items-center gap-3 px-6 h-16 border-b border-gray-200 dark:border-gray-800">
         <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
           <Wallet className="w-6 h-6 text-white" />
         </div>
