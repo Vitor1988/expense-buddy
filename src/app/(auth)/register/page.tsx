@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { signUp } from '@/app/actions/auth';
 import { Button } from '@/components/ui/button';
@@ -19,6 +20,7 @@ import { Loader2, Mail, Lock, User, Coins, AlertCircle } from 'lucide-react';
 import { CURRENCIES } from '@/types';
 
 export default function RegisterPage() {
+  const router = useRouter();
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [currency, setCurrency] = useState('USD');
@@ -33,6 +35,12 @@ export default function RegisterPage() {
     if (result?.error) {
       setError(result.error);
       setIsLoading(false);
+      return;
+    }
+
+    if (result?.requiresEmailConfirmation) {
+      router.push('/check-email');
+      return;
     }
   }
 

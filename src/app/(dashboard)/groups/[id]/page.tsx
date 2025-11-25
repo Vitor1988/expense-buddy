@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Receipt, Loader2, Users } from 'lucide-react';
+import { Plus, Receipt, Loader2 } from 'lucide-react';
 import { GroupHeader } from '@/components/groups/group-header';
 import { GroupForm } from '@/components/groups/group-form';
 import { SharedExpenseCard } from '@/components/groups/shared-expense-card';
@@ -260,23 +260,11 @@ export default function GroupDetailPage() {
 
         {/* Members Tab */}
         <TabsContent value="members" className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              {group.members.length} Member{group.members.length !== 1 ? 's' : ''}
-            </h3>
-            {/* Invite button will be added in Phase 2 */}
-          </div>
-
-          <MemberList members={group.members} currentUserId={currentUserId} />
-
-          <Card className="border-dashed">
-            <CardContent className="py-6 text-center">
-              <Users className="w-8 h-8 mx-auto mb-2 text-gray-400" />
-              <p className="text-sm text-gray-500 dark:text-gray-400">
-                Invite feature coming soon!
-              </p>
-            </CardContent>
-          </Card>
+          <MemberList
+            groupId={groupId}
+            members={group.members}
+            currentUserId={currentUserId}
+          />
         </TabsContent>
       </Tabs>
 

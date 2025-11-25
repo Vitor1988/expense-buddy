@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, Users, Loader2 } from 'lucide-react';
 import { GroupCard } from '@/components/groups/group-card';
 import { GroupForm } from '@/components/groups/group-form';
+import { PendingInvitationsBanner } from '@/components/groups/pending-invitations-banner';
 import { createGroup, getGroups, updateGroup } from '@/app/actions/groups';
 import { createClient } from '@/lib/supabase/client';
 import type { ExpenseGroup } from '@/types';
@@ -103,6 +104,9 @@ export default function GroupsPage() {
           Create Group
         </Button>
       </div>
+
+      {/* Pending Invitations */}
+      <PendingInvitationsBanner />
 
       {/* Summary Card */}
       {groups.length > 0 && (

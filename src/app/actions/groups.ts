@@ -604,3 +604,530 @@ export async function getDebts(groupId: string): Promise<{
 
   return { data: debts, error: null };
 }
+
+// ============ INVITATIONS ============
+
+function generateInviteToken(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let token = '';
+  for (let i = 0; i < 32; i++) {
+    token += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return token;
+}
+
+export async function sendInvitation(groupId: string, email: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check if user is admin of the group
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership || membership.role !== 'admin') {
+    return { error: 'Only admins can invite members' };
+  }
+
+  // Validate email
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailRegex.test(email)) {
+    return { error: 'Please enter a valid email address' };
+  }
+
+  // Check if email is already a member
+  const { data: existingUser } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('id', (await supabase.from('auth.users').select('id').eq('email', email).single()).data?.id)
+    .single();
+
+  if (existingUser) {
+    const { data: existingMember } = await supabase
+      .from('group_members')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('user_id', existingUser.id)
+      .single();
+
+    if (existingMember) {
+      return { error: 'This person is already a member of the group' };
+    }
+  }
+
+  // Check if there's already a pending invitation
+  const { data: existingInvite } = await supabase
+    .from('group_invitations')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('invited_email', email.toLowerCase())
+    .eq('status', 'pending')
+    .single();
+
+  if (existingInvite) {
+    return { error: 'An invitation has already been sent to this email' };
+  }
+
+  // Create invitation
+  const token = generateInviteToken();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // 7 days from now
+
+  const { error } = await supabase.from('group_invitations').insert({
+    group_id: groupId,
+    invited_email: email.toLowerCase(),
+    invited_by: user.id,
+    token,
+    expires_at: expiresAt.toISOString(),
+  });
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/groups/${groupId}`);
+  return { success: true, token };
+}
+
+export async function getInvitationByToken(token: string): Promise<{
+  data: {
+    id: string;
+    group_id: string;
+    invited_email: string;
+    status: string;
+    expires_at: string;
+    group: { name: string; description: string | null };
+    inviter: { full_name: string | null };
+  } | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from('group_invitations')
+    .select('id, group_id, invited_email, status, expires_at, group:expense_groups(name, description), inviter:profiles!group_invitations_invited_by_fkey(full_name)')
+    .eq('token', token)
+    .single();
+
+  if (error || !data) {
+    return { data: null, error: 'Invitation not found' };
+  }
+
+  // Check if expired
+  if (new Date(data.expires_at) < new Date()) {
+    return { data: null, error: 'This invitation has expired' };
+  }
+
+  if (data.status !== 'pending') {
+    return { data: null, error: `This invitation has already been ${data.status}` };
+  }
+
+  // Handle Supabase join types (returns arrays for relations)
+  const groupData = data.group as unknown as { name: string; description: string | null } | null;
+  const inviterData = data.inviter as unknown as { full_name: string | null } | null;
+
+  return {
+    data: {
+      id: data.id,
+      group_id: data.group_id,
+      invited_email: data.invited_email,
+      status: data.status,
+      expires_at: data.expires_at,
+      group: groupData || { name: 'Unknown', description: null },
+      inviter: inviterData || { full_name: null },
+    },
+    error: null,
+  };
+}
+
+export async function acceptInvitation(token: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Please log in to accept this invitation', requiresAuth: true };
+  }
+
+  // Get invitation
+  const { data: invitation, error: inviteError } = await supabase
+    .from('group_invitations')
+    .select('id, group_id, invited_email, status, expires_at')
+    .eq('token', token)
+    .single();
+
+  if (inviteError || !invitation) {
+    return { error: 'Invitation not found' };
+  }
+
+  // Check if expired
+  if (new Date(invitation.expires_at) < new Date()) {
+    await supabase
+      .from('group_invitations')
+      .update({ status: 'expired' })
+      .eq('id', invitation.id);
+    return { error: 'This invitation has expired' };
+  }
+
+  if (invitation.status !== 'pending') {
+    return { error: `This invitation has already been ${invitation.status}` };
+  }
+
+  // Check if user is already a member
+  const { data: existingMember } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', invitation.group_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (existingMember) {
+    // Update invitation status anyway
+    await supabase
+      .from('group_invitations')
+      .update({ status: 'accepted' })
+      .eq('id', invitation.id);
+    return { success: true, groupId: invitation.group_id };
+  }
+
+  // Add user as member
+  const { error: memberError } = await supabase.from('group_members').insert({
+    group_id: invitation.group_id,
+    user_id: user.id,
+    role: 'member',
+  });
+
+  if (memberError) {
+    return { error: memberError.message };
+  }
+
+  // Update invitation status
+  await supabase
+    .from('group_invitations')
+    .update({ status: 'accepted' })
+    .eq('id', invitation.id);
+
+  revalidatePath('/groups');
+  revalidatePath(`/groups/${invitation.group_id}`);
+  return { success: true, groupId: invitation.group_id };
+}
+
+export async function declineInvitation(token: string) {
+  const supabase = await createClient();
+
+  const { data: invitation, error: inviteError } = await supabase
+    .from('group_invitations')
+    .select('id, status')
+    .eq('token', token)
+    .single();
+
+  if (inviteError || !invitation) {
+    return { error: 'Invitation not found' };
+  }
+
+  if (invitation.status !== 'pending') {
+    return { error: `This invitation has already been ${invitation.status}` };
+  }
+
+  const { error } = await supabase
+    .from('group_invitations')
+    .update({ status: 'declined' })
+    .eq('id', invitation.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  return { success: true };
+}
+
+export async function getPendingInvitations(groupId: string): Promise<{
+  data: { id: string; invited_email: string; created_at: string; token: string }[] | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { data: null, error: 'Not authenticated' };
+  }
+
+  // Check if user is a member
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    return { data: null, error: 'You are not a member of this group' };
+  }
+
+  const { data, error } = await supabase
+    .from('group_invitations')
+    .select('id, invited_email, created_at, token')
+    .eq('group_id', groupId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  return { data, error: null };
+}
+
+export async function cancelInvitation(invitationId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Get invitation to check permissions
+  const { data: invitation } = await supabase
+    .from('group_invitations')
+    .select('group_id, status')
+    .eq('id', invitationId)
+    .single();
+
+  if (!invitation) {
+    return { error: 'Invitation not found' };
+  }
+
+  if (invitation.status !== 'pending') {
+    return { error: 'This invitation is no longer pending' };
+  }
+
+  // Check if user is admin
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', invitation.group_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership || membership.role !== 'admin') {
+    return { error: 'Only admins can cancel invitations' };
+  }
+
+  const { error } = await supabase
+    .from('group_invitations')
+    .delete()
+    .eq('id', invitationId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/groups/${invitation.group_id}`);
+  return { success: true };
+}
+
+export async function getMyPendingInvitations(): Promise<{
+  data: {
+    id: string;
+    token: string;
+    group: { id: string; name: string };
+    inviter: { full_name: string | null };
+    created_at: string;
+  }[] | null;
+  error: string | null;
+}> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user || !user.email) {
+    return { data: null, error: 'Not authenticated' };
+  }
+
+  const { data, error } = await supabase
+    .from('group_invitations')
+    .select('id, token, created_at, group:expense_groups(id, name), inviter:profiles!group_invitations_invited_by_fkey(full_name)')
+    .eq('invited_email', user.email.toLowerCase())
+    .eq('status', 'pending')
+    .gt('expires_at', new Date().toISOString())
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { data: null, error: error.message };
+  }
+
+  // Transform data to handle Supabase join types
+  const transformedData = (data || []).map((item) => {
+    const groupData = item.group as unknown as { id: string; name: string } | null;
+    const inviterData = item.inviter as unknown as { full_name: string | null } | null;
+
+    return {
+      id: item.id,
+      token: item.token,
+      created_at: item.created_at,
+      group: groupData || { id: '', name: 'Unknown' },
+      inviter: inviterData || { full_name: null },
+    };
+  });
+
+  return {
+    data: transformedData,
+    error: null,
+  };
+}
+
+// ============ MEMBER MANAGEMENT ============
+
+export async function removeMemberFromGroup(groupId: string, userId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check if current user is admin
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership || membership.role !== 'admin') {
+    return { error: 'Only admins can remove members' };
+  }
+
+  // Cannot remove yourself this way
+  if (userId === user.id) {
+    return { error: 'Use Leave Group to remove yourself' };
+  }
+
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/groups/${groupId}`);
+  return { success: true };
+}
+
+export async function updateMemberRole(groupId: string, userId: string, role: 'admin' | 'member') {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check if current user is admin
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership || membership.role !== 'admin') {
+    return { error: 'Only admins can change roles' };
+  }
+
+  // Cannot change your own role
+  if (userId === user.id) {
+    return { error: 'You cannot change your own role' };
+  }
+
+  const { error } = await supabase
+    .from('group_members')
+    .update({ role })
+    .eq('group_id', groupId)
+    .eq('user_id', userId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/groups/${groupId}`);
+  return { success: true };
+}
+
+export async function leaveGroup(groupId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check if user is a member
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    return { error: 'You are not a member of this group' };
+  }
+
+  // If user is admin, check if they're the last admin
+  if (membership.role === 'admin') {
+    const { data: admins } = await supabase
+      .from('group_members')
+      .select('id')
+      .eq('group_id', groupId)
+      .eq('role', 'admin');
+
+    if (admins && admins.length <= 1) {
+      return { error: 'You are the last admin. Please make someone else an admin before leaving or delete the group.' };
+    }
+  }
+
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .eq('group_id', groupId)
+    .eq('user_id', user.id);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath('/groups');
+  return { success: true };
+}

@@ -7,6 +7,7 @@ import { revalidatePath } from 'next/cache';
 export interface AuthResult {
   error?: string;
   success?: boolean;
+  requiresEmailConfirmation?: boolean;
 }
 
 export async function signUp(formData: FormData): Promise<AuthResult> {
@@ -65,6 +66,12 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     ];
 
     await supabase.from('categories').insert(defaultCategories);
+
+    // Check if email confirmation is required
+    // If user.identities is empty or email is not confirmed, redirect to confirmation page
+    if (!data.user.email_confirmed_at) {
+      return { success: true, requiresEmailConfirmation: true };
+    }
   }
 
   revalidatePath('/', 'layout');
