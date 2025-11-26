@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, Receipt, AlertCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import type { GroupMember, SplitMethod } from '@/types';
 import { calculateSplits, type SplitInput, type SplitResult } from '@/lib/split-calculator';
@@ -181,7 +182,7 @@ export function SharedExpenseForm({
 
     const result = await action(formData);
     if (result?.error) {
-      alert(result.error);
+      toast.error(result.error);
     }
   };
 

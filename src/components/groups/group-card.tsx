@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { MoreVertical, Trash2, Pencil, Users, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { deleteGroup } from '@/app/actions/groups';
 import type { ExpenseGroup } from '@/types';
 
@@ -43,8 +44,9 @@ export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps
     setIsDeleting(true);
     const result = await deleteGroup(group.id);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
     } else {
+      toast.success('Group deleted');
       onDeleted();
     }
     setIsDeleting(false);

@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Users } from 'lucide-react';
+import { toast } from 'sonner';
 import type { ExpenseGroup } from '@/types';
 
 interface GroupFormProps {
@@ -49,8 +50,9 @@ export function GroupForm({ group, action, open, onOpenChange }: GroupFormProps)
   const handleSubmit = async (formData: FormData) => {
     const result = await action(formData);
     if (result?.error) {
-      alert(result.error);
+      toast.error(result.error);
     } else {
+      toast.success(group ? 'Group updated' : 'Group created');
       onOpenChange(false);
     }
   };

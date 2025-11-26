@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Mail, Check, X, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { getMyPendingInvitations, acceptInvitation, declineInvitation } from '@/app/actions/groups';
 
 interface PendingInvite {
@@ -38,11 +39,12 @@ export function PendingInvitationsBanner() {
     const result = await acceptInvitation(invite.token);
 
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       setProcessingId(null);
       return;
     }
 
+    toast.success('Invitation accepted');
     // Remove from list and redirect
     setInvites((prev) => prev.filter((i) => i.id !== invite.id));
     setProcessingId(null);
@@ -57,11 +59,12 @@ export function PendingInvitationsBanner() {
     const result = await declineInvitation(invite.token);
 
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       setProcessingId(null);
       return;
     }
 
+    toast.success('Invitation declined');
     // Remove from list
     setInvites((prev) => prev.filter((i) => i.id !== invite.id));
     setProcessingId(null);

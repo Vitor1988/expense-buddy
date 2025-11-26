@@ -19,6 +19,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { MoreVertical, Trash2, Receipt, Loader2, CheckCircle } from 'lucide-react';
+import { toast } from 'sonner';
 import { deleteSharedExpense } from '@/app/actions/groups';
 import { formatDate } from '@/lib/utils';
 import type { SharedExpense, ExpenseSplit } from '@/types';
@@ -59,8 +60,9 @@ export function SharedExpenseCard({
     setIsDeleting(true);
     const result = await deleteSharedExpense(expense.id);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
     } else {
+      toast.success('Expense deleted');
       onDeleted();
     }
     setIsDeleting(false);

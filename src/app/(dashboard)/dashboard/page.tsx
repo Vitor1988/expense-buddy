@@ -10,7 +10,9 @@ import {
   Plus,
 } from 'lucide-react';
 import { MonthlyExpenseSection } from '@/components/dashboard/monthly-expense-section';
+import { GroupsBalanceWidget } from '@/components/dashboard/groups-balance-widget';
 import { getExpensesByMonth } from '@/app/actions/expenses';
+import { getGroups } from '@/app/actions/groups';
 import type { CurrencyCode } from '@/types';
 
 export default async function DashboardPage() {
@@ -51,6 +53,9 @@ export default async function DashboardPage() {
 
   // Get monthly expense data for the collapsible section
   const { data: monthlyData } = await getExpensesByMonth(3);
+
+  // Get groups with balances
+  const { data: groups } = await getGroups();
 
   const currency = (profile?.currency || 'USD') as CurrencyCode;
   const formatter = new Intl.NumberFormat('en-US', {
@@ -170,11 +175,17 @@ export default async function DashboardPage() {
         </Card>
       </div>
 
-      {/* Monthly Expenses Section */}
-      <MonthlyExpenseSection
-        initialData={monthlyData || []}
-        currency={currency}
-      />
+      {/* Monthly Expenses & Groups Balance */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <MonthlyExpenseSection
+          initialData={monthlyData || []}
+          currency={currency}
+        />
+        <GroupsBalanceWidget
+          groups={groups || []}
+          currency={currency}
+        />
+      </div>
     </div>
   );
 }

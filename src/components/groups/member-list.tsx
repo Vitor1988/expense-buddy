@@ -13,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Crown, MoreVertical, UserMinus, Shield, ShieldOff, Clock, X, Mail } from 'lucide-react';
+import { toast } from 'sonner';
 import { MemberInviteForm } from './member-invite-form';
 import { getPendingInvitations, cancelInvitation, removeMemberFromGroup, updateMemberRole } from '@/app/actions/groups';
 import type { GroupMember } from '@/types';
@@ -60,7 +61,9 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
     setLoading(true);
     const result = await removeMemberFromGroup(groupId, userId);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
+    } else {
+      toast.success('Member removed');
     }
     setLoading(false);
   };
@@ -70,7 +73,9 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
     setLoading(true);
     const result = await updateMemberRole(groupId, userId, newRole);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
+    } else {
+      toast.success(`Role updated to ${newRole}`);
     }
     setLoading(false);
   };

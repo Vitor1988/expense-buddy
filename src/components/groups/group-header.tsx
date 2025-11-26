@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ArrowLeft, Settings, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { deleteGroup } from '@/app/actions/groups';
 import type { ExpenseGroup, GroupMember } from '@/types';
 
@@ -44,9 +45,10 @@ export function GroupHeader({ group, currentUserId, onEdit }: GroupHeaderProps) 
     setIsDeleting(true);
     const result = await deleteGroup(group.id);
     if (result.error) {
-      alert(result.error);
+      toast.error(result.error);
       setIsDeleting(false);
     } else {
+      toast.success('Group deleted');
       router.push('/groups');
     }
   };
