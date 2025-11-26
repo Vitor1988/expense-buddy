@@ -1,7 +1,5 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -17,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { FormSubmitButton } from '@/components/shared';
 import { type Category } from '@/types';
 
 interface BudgetFormData {
@@ -34,27 +32,6 @@ interface BudgetFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currency?: string;
-}
-
-function SubmitButton({ isEdit }: { isEdit: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-emerald-500 hover:bg-emerald-600"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          {isEdit ? 'Updating...' : 'Creating...'}
-        </>
-      ) : (
-        <>{isEdit ? 'Update Budget' : 'Create Budget'}</>
-      )}
-    </Button>
-  );
 }
 
 export function BudgetForm({ categories, budget, action, open, onOpenChange, currency = 'USD' }: BudgetFormProps) {
@@ -141,7 +118,12 @@ export function BudgetForm({ categories, budget, action, open, onOpenChange, cur
             </Select>
           </div>
 
-          <SubmitButton isEdit={!!budget} />
+          <FormSubmitButton
+            className="w-full bg-emerald-500 hover:bg-emerald-600"
+            loadingText={budget ? 'Updating...' : 'Creating...'}
+          >
+            {budget ? 'Update Budget' : 'Create Budget'}
+          </FormSubmitButton>
         </form>
       </DialogContent>
     </Dialog>

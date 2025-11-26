@@ -1,7 +1,5 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -17,7 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { FormSubmitButton } from '@/components/shared';
 import { type Category, type RecurringExpense } from '@/types';
 
 interface RecurringFormProps {
@@ -27,27 +25,6 @@ interface RecurringFormProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   currency?: string;
-}
-
-function SubmitButton({ isEdit }: { isEdit: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-emerald-500 hover:bg-emerald-600"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          {isEdit ? 'Updating...' : 'Creating...'}
-        </>
-      ) : (
-        <>{isEdit ? 'Update Recurring' : 'Create Recurring'}</>
-      )}
-    </Button>
-  );
 }
 
 export function RecurringForm({ categories, recurring, action, open, onOpenChange, currency = 'USD' }: RecurringFormProps) {
@@ -160,7 +137,12 @@ export function RecurringForm({ categories, recurring, action, open, onOpenChang
             />
           </div>
 
-          <SubmitButton isEdit={!!recurring} />
+          <FormSubmitButton
+            className="w-full bg-emerald-500 hover:bg-emerald-600"
+            loadingText={recurring ? 'Updating...' : 'Creating...'}
+          >
+            {recurring ? 'Update Recurring' : 'Create Recurring'}
+          </FormSubmitButton>
         </form>
       </DialogContent>
     </Dialog>

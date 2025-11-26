@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useFormStatus } from 'react-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,9 +16,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Loader2, Receipt, AlertCircle } from 'lucide-react';
+import { Receipt, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { FormSubmitButton } from '@/components/shared';
 import type { GroupMember, SplitMethod, SharedExpense, ExpenseSplit } from '@/types';
 import { calculateSplits, type SplitInput, type SplitResult } from '@/lib/split-calculator';
 
@@ -34,30 +34,6 @@ interface SharedExpenseFormProps {
   currency: string;
   action: (formData: FormData) => Promise<{ error?: string; success?: boolean }>;
   expense?: ExpenseWithSplits;
-}
-
-function SubmitButton({ disabled, isEditing }: { disabled?: boolean; isEditing?: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-emerald-500 hover:bg-emerald-600"
-      disabled={pending || disabled}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          {isEditing ? 'Updating Expense...' : 'Adding Expense...'}
-        </>
-      ) : (
-        <>
-          <Receipt className="w-4 h-4 mr-2" />
-          {isEditing ? 'Update Expense' : 'Add Expense'}
-        </>
-      )}
-    </Button>
-  );
 }
 
 export function SharedExpenseForm({
@@ -576,7 +552,14 @@ export function SharedExpenseForm({
         </Card>
       )}
 
-      <SubmitButton disabled={!!splitError || selectedMembers.length === 0} isEditing={isEditing} />
+      <FormSubmitButton
+        className="w-full bg-emerald-500 hover:bg-emerald-600"
+        loadingText={isEditing ? 'Updating Expense...' : 'Adding Expense...'}
+        icon={<Receipt className="w-4 h-4 mr-2" />}
+        disabled={!!splitError || selectedMembers.length === 0}
+      >
+        {isEditing ? 'Update Expense' : 'Add Expense'}
+      </FormSubmitButton>
     </form>
   );
 }

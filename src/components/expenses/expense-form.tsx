@@ -1,8 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,7 +12,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, Receipt } from 'lucide-react';
+import { Receipt } from 'lucide-react';
+import { FormSubmitButton } from '@/components/shared';
 import { type Category, type Expense } from '@/types';
 import { ReceiptUpload } from './receipt-upload';
 
@@ -23,30 +22,6 @@ interface ExpenseFormProps {
   expense?: Expense;
   action: (formData: FormData) => Promise<{ error?: string }>;
   currency?: string;
-}
-
-function SubmitButton({ isEdit }: { isEdit: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-emerald-500 hover:bg-emerald-600"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          {isEdit ? 'Updating...' : 'Adding...'}
-        </>
-      ) : (
-        <>
-          <Receipt className="w-4 h-4 mr-2" />
-          {isEdit ? 'Update Expense' : 'Add Expense'}
-        </>
-      )}
-    </Button>
-  );
 }
 
 export function ExpenseForm({ categories, expense, action, currency = 'USD' }: ExpenseFormProps) {
@@ -178,7 +153,13 @@ export function ExpenseForm({ categories, expense, action, currency = 'USD' }: E
             />
           </div>
 
-          <SubmitButton isEdit={!!expense} />
+          <FormSubmitButton
+            className="w-full bg-emerald-500 hover:bg-emerald-600"
+            loadingText={expense ? 'Updating...' : 'Adding...'}
+            icon={<Receipt className="w-4 h-4 mr-2" />}
+          >
+            {expense ? 'Update Expense' : 'Add Expense'}
+          </FormSubmitButton>
         </form>
       </CardContent>
     </Card>

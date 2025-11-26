@@ -14,17 +14,16 @@ import {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Trash2, Receipt, Loader2, CheckCircle, Pencil } from 'lucide-react';
+import { MoreVertical, Trash2, Receipt, CheckCircle, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { deleteSharedExpense, updateSharedExpense } from '@/app/actions/groups';
 import { formatDate } from '@/lib/utils';
 import { SharedExpenseForm } from './shared-expense-form';
+import { DeleteConfirmationDialog, IconBadge } from '@/components/shared';
 import type { SharedExpense, ExpenseSplit, GroupMember } from '@/types';
 
 interface SimplifiedDebt {
@@ -59,7 +58,6 @@ export function SharedExpenseCard({
 }: SharedExpenseCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const canEdit = expense.paid_by === currentUserId || members.some(
     (m) => m.user_id === currentUserId && m.role === 'admin'
@@ -71,16 +69,14 @@ export function SharedExpenseCard({
   });
 
   const handleDelete = async () => {
-    setIsDeleting(true);
     const result = await deleteSharedExpense(expense.id);
     if (result.error) {
       toast.error(result.error);
-    } else {
-      toast.success('Expense deleted');
-      onDeleted();
+      return;
     }
-    setIsDeleting(false);
+    toast.success('Expense deleted');
     setShowDeleteDialog(false);
+    onDeleted();
   };
 
   const payerInitials = expense.payer?.full_name
@@ -108,9 +104,7 @@ export function SharedExpenseCard({
         <CardContent className="p-4">
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <Receipt className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              </div>
+              <IconBadge icon={<Receipt />} color="blue" />
               <div className="flex-1 min-w-0">
                 <p className="font-medium text-gray-900 dark:text-white">
                   {expense.description}
@@ -200,39 +194,13 @@ export function SharedExpenseCard({
         </CardContent>
       </Card>
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Expense</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this expense? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDelete}
+        title="Delete Expense"
+        description="Are you sure you want to delete this expense? This action cannot be undone."
+      />
 
       {/* Edit Dialog */}
       {members.length > 0 && (

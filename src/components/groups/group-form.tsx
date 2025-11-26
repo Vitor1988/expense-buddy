@@ -1,18 +1,17 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Users } from 'lucide-react';
+import { Users } from 'lucide-react';
 import { toast } from 'sonner';
+import { FormSubmitButton } from '@/components/shared';
 import type { ExpenseGroup } from '@/types';
 
 interface GroupFormProps {
@@ -20,30 +19,6 @@ interface GroupFormProps {
   action: (formData: FormData) => Promise<{ error?: string; success?: boolean }>;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-}
-
-function SubmitButton({ isEdit }: { isEdit: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-emerald-500 hover:bg-emerald-600"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          {isEdit ? 'Updating...' : 'Creating...'}
-        </>
-      ) : (
-        <>
-          <Users className="w-4 h-4 mr-2" />
-          {isEdit ? 'Update Group' : 'Create Group'}
-        </>
-      )}
-    </Button>
-  );
 }
 
 export function GroupForm({ group, action, open, onOpenChange }: GroupFormProps) {
@@ -86,7 +61,13 @@ export function GroupForm({ group, action, open, onOpenChange }: GroupFormProps)
             />
           </div>
 
-          <SubmitButton isEdit={!!group} />
+          <FormSubmitButton
+            className="w-full bg-emerald-500 hover:bg-emerald-600"
+            loadingText={group ? 'Updating...' : 'Creating...'}
+            icon={<Users className="w-4 h-4 mr-2" />}
+          >
+            {group ? 'Update Group' : 'Create Group'}
+          </FormSubmitButton>
         </form>
       </DialogContent>
     </Dialog>

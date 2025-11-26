@@ -1,7 +1,5 @@
 'use client';
 
-import { useFormStatus } from 'react-dom';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -10,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { FormSubmitButton } from '@/components/shared';
 import { type Category } from '@/types';
 
 interface CategoryFormProps {
@@ -26,27 +24,6 @@ const COLOR_OPTIONS = [
   '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6',
   '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#6b7280',
 ];
-
-function SubmitButton({ isEdit }: { isEdit: boolean }) {
-  const { pending } = useFormStatus();
-
-  return (
-    <Button
-      type="submit"
-      className="w-full bg-emerald-500 hover:bg-emerald-600"
-      disabled={pending}
-    >
-      {pending ? (
-        <>
-          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          {isEdit ? 'Updating...' : 'Creating...'}
-        </>
-      ) : (
-        <>{isEdit ? 'Update Category' : 'Create Category'}</>
-      )}
-    </Button>
-  );
-}
 
 export function CategoryForm({ category, action, open, onOpenChange }: CategoryFormProps) {
   const handleSubmit = async (formData: FormData) => {
@@ -117,7 +94,12 @@ export function CategoryForm({ category, action, open, onOpenChange }: CategoryF
             </div>
           </div>
 
-          <SubmitButton isEdit={!!category} />
+          <FormSubmitButton
+            className="w-full bg-emerald-500 hover:bg-emerald-600"
+            loadingText={category ? 'Updating...' : 'Creating...'}
+          >
+            {category ? 'Update Category' : 'Create Category'}
+          </FormSubmitButton>
         </form>
       </DialogContent>
     </Dialog>

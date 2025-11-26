@@ -84,33 +84,36 @@ export default function GroupDetailPage() {
       }
     }
 
-    // Get group details
-    const { data: groupData, error: groupError } = await getGroupById(groupId);
+    // Fetch all group data in parallel for better performance
+    const [
+      groupResult,
+      expensesResult,
+      settlementsResult,
+      balancesResult,
+      debtsResult,
+      simplifiedDebtsResult,
+    ] = await Promise.all([
+      getGroupById(groupId),
+      getGroupExpenses(groupId),
+      getGroupSettlements(groupId),
+      getGroupBalances(groupId),
+      getDebts(groupId),
+      getSimplifiedDebts(groupId),
+    ]);
+
+    // Extract data from results
+    const { data: groupData, error: groupError } = groupResult;
     if (groupError) {
       console.error('Error loading group:', groupError);
     } else {
       setGroup(groupData);
     }
 
-    // Get expenses
-    const { data: expensesData } = await getGroupExpenses(groupId);
-    setExpenses(expensesData || []);
-
-    // Get settlements
-    const { data: settlementsData } = await getGroupSettlements(groupId);
-    setSettlements(settlementsData || []);
-
-    // Get balances
-    const { data: balancesData } = await getGroupBalances(groupId);
-    setBalances(balancesData || []);
-
-    // Get debts
-    const { data: debtsData } = await getDebts(groupId);
-    setDebts(debtsData || []);
-
-    // Get simplified debts for settlements
-    const { data: simplifiedDebtsData } = await getSimplifiedDebts(groupId);
-    setSimplifiedDebts(simplifiedDebtsData || []);
+    setExpenses(expensesResult.data || []);
+    setSettlements(settlementsResult.data || []);
+    setBalances(balancesResult.data || []);
+    setDebts(debtsResult.data || []);
+    setSimplifiedDebts(simplifiedDebtsResult.data || []);
 
     setLoading(false);
   }, [groupId]);

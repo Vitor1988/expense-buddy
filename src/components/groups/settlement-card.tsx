@@ -3,19 +3,9 @@
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
-import { HandCoins, Trash2, Loader2 } from 'lucide-react';
+import { HandCoins, Trash2 } from 'lucide-react';
 import { deleteSettlement } from '@/app/actions/groups';
+import { DeleteConfirmationDialog, IconBadge } from '@/components/shared';
 
 interface SettlementCardProps {
   settlement: {
@@ -37,7 +27,7 @@ export function SettlementCard({
   currentUserId,
   onDeleted,
 }: SettlementCardProps) {
-  const [deleting, setDeleting] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -49,10 +39,9 @@ export function SettlementCard({
   const toName = settlement.to_user?.id === currentUserId ? 'you' : settlement.to_user?.full_name || 'Unknown';
 
   const handleDelete = async () => {
-    setDeleting(true);
     const result = await deleteSettlement(settlement.id);
-    setDeleting(false);
     if (result.success) {
+      setShowDeleteDialog(false);
       onDeleted();
     }
   };
@@ -62,9 +51,7 @@ export function SettlementCard({
       <CardContent className="pt-4">
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-              <HandCoins className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-            </div>
+            <IconBadge icon={<HandCoins />} color="emerald" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 dark:text-white">
                 {fromName} paid {toName}
@@ -88,39 +75,25 @@ export function SettlementCard({
           </div>
 
           {isMySettlement && (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="text-gray-400 hover:text-red-500"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Delete Settlement</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    Are you sure you want to delete this settlement record? This will affect the group balances.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={handleDelete}
-                    className="bg-red-500 hover:bg-red-600"
-                    disabled={deleting}
-                  >
-                    {deleting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                    Delete
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-400 hover:text-red-500"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
           )}
         </div>
       </CardContent>
+
+      <DeleteConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDelete}
+        title="Delete Settlement"
+        description="Are you sure you want to delete this settlement record? This will affect the group balances."
+      />
     </Card>
   );
 }
