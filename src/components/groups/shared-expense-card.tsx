@@ -8,6 +8,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -18,17 +19,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MoreVertical, Trash2, Receipt, Loader2, CheckCircle } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { MoreVertical, Trash2, Receipt, Loader2, CheckCircle, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
-import { deleteSharedExpense } from '@/app/actions/groups';
+import { deleteSharedExpense, updateSharedExpense } from '@/app/actions/groups';
 import { formatDate } from '@/lib/utils';
-import type { SharedExpense, ExpenseSplit } from '@/types';
+import { SharedExpenseForm } from './shared-expense-form';
+import type { SharedExpense, ExpenseSplit, GroupMember } from '@/types';
 
 interface SimplifiedDebt {
   from_user_id: string;
   to_user_id: string;
   amount: number;
 }
+
+type MemberWithProfile = GroupMember & {
+  profile: { id: string; full_name: string | null; avatar_url: string | null };
+};
 
 interface SharedExpenseCardProps {
   expense: SharedExpense & {
@@ -39,6 +46,7 @@ interface SharedExpenseCardProps {
   currentUserId: string;
   onDeleted: () => void;
   simplifiedDebts?: SimplifiedDebt[];
+  members?: MemberWithProfile[];
 }
 
 export function SharedExpenseCard({
@@ -47,9 +55,15 @@ export function SharedExpenseCard({
   currentUserId,
   onDeleted,
   simplifiedDebts = [],
+  members = [],
 }: SharedExpenseCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  const canEdit = expense.paid_by === currentUserId || members.some(
+    (m) => m.user_id === currentUserId && m.role === 'admin'
+  );
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -154,6 +168,15 @@ export function SharedExpenseCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  {canEdit && members.length > 0 && (
+                    <>
+                      <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
+                        <Pencil className="w-4 h-4 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuSeparator />
+                    </>
+                  )}
                   <DropdownMenuItem
                     onClick={() => setShowDeleteDialog(true)}
                     className="text-red-600 dark:text-red-400"
@@ -210,6 +233,36 @@ export function SharedExpenseCard({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Dialog */}
+      {members.length > 0 && (
+        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
+          <DialogContent className="max-w-2xl max-h-[90vh] p-0">
+            <DialogHeader className="px-6 pt-6 pb-0">
+              <DialogTitle>Edit Expense</DialogTitle>
+            </DialogHeader>
+            <ScrollArea className="max-h-[calc(90vh-80px)] px-6 pb-6">
+              <SharedExpenseForm
+                groupId={expense.group_id}
+                members={members}
+                currentUserId={currentUserId}
+                currency={currency}
+                expense={expense}
+                action={async (formData) => {
+                  const result = await updateSharedExpense(expense.id, formData);
+                  if (result.error) {
+                    return { error: result.error };
+                  }
+                  toast.success('Expense updated');
+                  setShowEditDialog(false);
+                  onDeleted(); // Refresh the list
+                  return { success: true };
+                }}
+              />
+            </ScrollArea>
+          </DialogContent>
+        </Dialog>
+      )}
     </>
   );
 }

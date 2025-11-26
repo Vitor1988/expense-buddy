@@ -20,18 +20,23 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Loader2, Receipt, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import type { GroupMember, SplitMethod } from '@/types';
+import type { GroupMember, SplitMethod, SharedExpense, ExpenseSplit } from '@/types';
 import { calculateSplits, type SplitInput, type SplitResult } from '@/lib/split-calculator';
+
+type ExpenseWithSplits = SharedExpense & {
+  splits: ExpenseSplit[];
+};
 
 interface SharedExpenseFormProps {
   groupId: string;
   members: (GroupMember & { profile: { id: string; full_name: string | null; avatar_url: string | null } })[];
   currentUserId: string;
   currency: string;
-  action: (formData: FormData) => Promise<{ error?: string }>;
+  action: (formData: FormData) => Promise<{ error?: string; success?: boolean }>;
+  expense?: ExpenseWithSplits;
 }
 
-function SubmitButton({ disabled }: { disabled?: boolean }) {
+function SubmitButton({ disabled, isEditing }: { disabled?: boolean; isEditing?: boolean }) {
   const { pending } = useFormStatus();
 
   return (
@@ -43,12 +48,12 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
       {pending ? (
         <>
           <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-          Adding Expense...
+          {isEditing ? 'Updating Expense...' : 'Adding Expense...'}
         </>
       ) : (
         <>
           <Receipt className="w-4 h-4 mr-2" />
-          Add Expense
+          {isEditing ? 'Update Expense' : 'Add Expense'}
         </>
       )}
     </Button>
@@ -61,28 +66,60 @@ export function SharedExpenseForm({
   currentUserId,
   currency,
   action,
+  expense,
 }: SharedExpenseFormProps) {
-  const [amount, setAmount] = useState('');
-  const [paidBy, setPaidBy] = useState(currentUserId);
-  const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
-  const [selectedMembers, setSelectedMembers] = useState<string[]>(
-    members.map((m) => m.user_id)
-  );
+  const isEditing = !!expense;
 
-  // For exact amounts
-  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>(() =>
-    Object.fromEntries(members.map((m) => [m.user_id, '']))
-  );
+  // Initialize state with expense data when editing
+  const [amount, setAmount] = useState(expense?.amount?.toString() || '');
+  const [description, setDescription] = useState(expense?.description || '');
+  const [date, setDate] = useState(expense?.date || new Date().toISOString().split('T')[0]);
+  const [notes, setNotes] = useState(expense?.notes || '');
+  const [paidBy, setPaidBy] = useState(expense?.paid_by || currentUserId);
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>(expense?.split_method || 'equal');
+  const [selectedMembers, setSelectedMembers] = useState<string[]>(() => {
+    if (expense?.splits && expense.splits.length > 0) {
+      return expense.splits.map((s) => s.user_id);
+    }
+    return members.map((m) => m.user_id);
+  });
 
-  // For percentages
-  const [percentages, setPercentages] = useState<Record<string, string>>(() =>
-    Object.fromEntries(members.map((m) => [m.user_id, '']))
-  );
+  // For exact amounts - initialize from expense splits if editing
+  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>(() => {
+    const initial = Object.fromEntries(members.map((m) => [m.user_id, '']));
+    if (expense?.split_method === 'exact' && expense.splits) {
+      expense.splits.forEach((split) => {
+        initial[split.user_id] = split.amount.toString();
+      });
+    }
+    return initial;
+  });
 
-  // For shares
-  const [shares, setShares] = useState<Record<string, string>>(() =>
-    Object.fromEntries(members.map((m) => [m.user_id, '1']))
-  );
+  // For percentages - initialize from expense splits if editing
+  const [percentages, setPercentages] = useState<Record<string, string>>(() => {
+    const initial = Object.fromEntries(members.map((m) => [m.user_id, '']));
+    if (expense?.split_method === 'percentage' && expense.splits) {
+      expense.splits.forEach((split) => {
+        if (split.percentage !== null) {
+          initial[split.user_id] = split.percentage.toString();
+        }
+      });
+    }
+    return initial;
+  });
+
+  // For shares - initialize from expense splits if editing
+  const [shares, setShares] = useState<Record<string, string>>(() => {
+    const initial = Object.fromEntries(members.map((m) => [m.user_id, '1']));
+    if (expense?.split_method === 'shares' && expense.splits) {
+      expense.splits.forEach((split) => {
+        if (split.shares !== null) {
+          initial[split.user_id] = split.shares.toString();
+        }
+      });
+    }
+    return initial;
+  });
 
   const [splitPreview, setSplitPreview] = useState<SplitResult[]>([]);
   const [splitError, setSplitError] = useState<string | null>(null);
@@ -248,6 +285,8 @@ export function SharedExpenseForm({
               id="description"
               name="description"
               placeholder="What was this for?"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
               required
             />
           </div>
@@ -258,7 +297,8 @@ export function SharedExpenseForm({
               id="date"
               name="date"
               type="date"
-              defaultValue={new Date().toISOString().split('T')[0]}
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
               required
             />
           </div>
@@ -269,6 +309,8 @@ export function SharedExpenseForm({
               id="notes"
               name="notes"
               placeholder="Any additional details..."
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
               rows={2}
             />
           </div>
@@ -534,7 +576,7 @@ export function SharedExpenseForm({
         </Card>
       )}
 
-      <SubmitButton disabled={!!splitError || selectedMembers.length === 0} />
+      <SubmitButton disabled={!!splitError || selectedMembers.length === 0} isEditing={isEditing} />
     </form>
   );
 }

@@ -153,53 +153,24 @@ npm run lint     # Run ESLint
 - [x] Member list with admin actions
 - [x] Invite member dialog with email and copy link
 
-### Phase 3: Advanced Splits - PENDING
-- [ ] Split calculator library (equal, percentage, shares, exact)
-- [ ] Split method selector UI
-- [ ] Dynamic split inputs per method
-- [ ] Edit expense functionality
+### Phase 3: Advanced Splits - COMPLETED
+- [x] Split calculator library (equal, percentage, shares, exact)
+- [x] Split method selector UI
+- [x] Dynamic split inputs per method
+- [x] Edit expense functionality
 
-### Phase 4: Settlements & Debt Simplification - PENDING
-- [ ] Debt simplification algorithm
-- [ ] Settlement recording
-- [ ] Settle up page
-- [ ] Activity feed with settlements
+### Phase 4: Settlements & Debt Simplification - COMPLETED
+- [x] Debt simplification algorithm
+- [x] Settlement recording
+- [x] Settle up dialog
+- [x] Activity feed with settlements
 
-### Phase 5: Polish - PENDING
+### Phase 5: Polish - IN PROGRESS
 - [ ] Toast notifications for all actions
-- [ ] Skeleton loaders
+- [x] Skeleton loaders
 - [ ] Edge case handling
 - [ ] Dashboard groups balance widget
 - [ ] Mobile UX improvements
-
-## Pending SQL Migrations
-
-Run in Supabase SQL Editor to enable RLS for group_invitations:
-
-```sql
--- Enable RLS for group_invitations
-ALTER TABLE group_invitations ENABLE ROW LEVEL SECURITY;
-
--- Policies for group_invitations
-CREATE POLICY "group_invitations_select" ON group_invitations
-  FOR SELECT USING (
-    invited_email = (SELECT email FROM auth.users WHERE id = auth.uid()) OR
-    invited_by = auth.uid() OR
-    group_id IN (SELECT id FROM expense_groups WHERE created_by = auth.uid())
-  );
-
-CREATE POLICY "group_invitations_insert" ON group_invitations
-  FOR INSERT WITH CHECK (invited_by = auth.uid());
-
-CREATE POLICY "group_invitations_update" ON group_invitations
-  FOR UPDATE USING (
-    invited_email = (SELECT email FROM auth.users WHERE id = auth.uid()) OR
-    invited_by = auth.uid()
-  );
-
-CREATE POLICY "group_invitations_delete" ON group_invitations
-  FOR DELETE USING (invited_by = auth.uid());
-```
 
 ## Supabase Configuration Required
 

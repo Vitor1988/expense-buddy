@@ -189,6 +189,7 @@ export default function GroupDetailPage() {
                     currentUserId={currentUserId}
                     onDeleted={loadData}
                     simplifiedDebts={simplifiedDebts}
+                    members={group?.members}
                   />
                 ) : (
                   <SettlementCard

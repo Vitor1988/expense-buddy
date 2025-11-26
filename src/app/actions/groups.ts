@@ -360,6 +360,148 @@ export async function createSharedExpense(groupId: string, formData: FormData) {
   redirect(`/groups/${groupId}`);
 }
 
+export async function updateSharedExpense(expenseId: string, formData: FormData) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Get the existing expense
+  const { data: existingExpense } = await supabase
+    .from('shared_expenses')
+    .select('group_id, paid_by')
+    .eq('id', expenseId)
+    .single();
+
+  if (!existingExpense) {
+    return { error: 'Expense not found' };
+  }
+
+  // Check if user is a member and get role
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('role')
+    .eq('group_id', existingExpense.group_id)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    return { error: 'You are not a member of this group' };
+  }
+
+  // Only payer or admin can edit
+  if (existingExpense.paid_by !== user.id && membership.role !== 'admin') {
+    return { error: 'Only the payer or an admin can edit this expense' };
+  }
+
+  const amount = parseFloat(formData.get('amount') as string);
+  const description = formData.get('description') as string;
+  const date = formData.get('date') as string;
+  const paid_by = formData.get('paid_by') as string;
+  const split_method = (formData.get('split_method') as string) || 'equal';
+  const notes = formData.get('notes') as string;
+  const splitMembersJson = formData.get('split_members') as string;
+
+  if (!amount || isNaN(amount) || amount <= 0) {
+    return { error: 'Please enter a valid amount' };
+  }
+
+  if (!description || description.trim().length === 0) {
+    return { error: 'Description is required' };
+  }
+
+  // Parse split members
+  let splitMembers: string[] = [];
+  try {
+    splitMembers = JSON.parse(splitMembersJson || '[]');
+  } catch {
+    return { error: 'Invalid split members data' };
+  }
+
+  if (splitMembers.length === 0) {
+    return { error: 'Please select at least one member to split with' };
+  }
+
+  // Parse split values for non-equal methods
+  let splitValues: SplitInput[] | undefined;
+  const splitValuesJson = formData.get('split_values') as string;
+  if (splitValuesJson && split_method !== 'equal') {
+    try {
+      splitValues = JSON.parse(splitValuesJson);
+    } catch {
+      return { error: 'Invalid split values data' };
+    }
+  }
+
+  // Calculate splits using the split calculator
+  const splitResult = calculateSplits(
+    split_method as SplitMethod,
+    amount,
+    splitMembers,
+    splitValues
+  );
+
+  if (splitResult.error) {
+    return { error: splitResult.error };
+  }
+
+  if (splitResult.splits.length === 0) {
+    return { error: 'No valid splits calculated' };
+  }
+
+  // Update the shared expense
+  const { error: expenseError } = await supabase
+    .from('shared_expenses')
+    .update({
+      paid_by: paid_by || user.id,
+      amount,
+      description: description.trim(),
+      date: date || new Date().toISOString().split('T')[0],
+      split_method,
+      notes: notes?.trim() || null,
+    })
+    .eq('id', expenseId);
+
+  if (expenseError) {
+    return { error: expenseError.message };
+  }
+
+  // Delete old splits
+  const { error: deleteError } = await supabase
+    .from('expense_splits')
+    .delete()
+    .eq('shared_expense_id', expenseId);
+
+  if (deleteError) {
+    return { error: deleteError.message };
+  }
+
+  // Create new splits
+  const splits = splitResult.splits.map((split) => ({
+    shared_expense_id: expenseId,
+    user_id: split.userId,
+    amount: split.amount,
+    shares: split.shares,
+    percentage: split.percentage,
+    is_settled: false,
+  }));
+
+  const { error: splitsError } = await supabase.from('expense_splits').insert(splits);
+
+  if (splitsError) {
+    return { error: splitsError.message };
+  }
+
+  revalidatePath('/groups');
+  revalidatePath(`/groups/${existingExpense.group_id}`);
+  return { success: true };
+}
+
 export async function getGroupExpenses(groupId: string): Promise<{
   data: (SharedExpense & { payer: { id: string; full_name: string | null; avatar_url: string | null }; splits: ExpenseSplit[] })[] | null;
   error: string | null;
