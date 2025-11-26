@@ -10,14 +10,19 @@ import { Plus, Receipt, Loader2 } from 'lucide-react';
 import { GroupHeader } from '@/components/groups/group-header';
 import { GroupForm } from '@/components/groups/group-form';
 import { SharedExpenseCard } from '@/components/groups/shared-expense-card';
+import { SettlementCard } from '@/components/groups/settlement-card';
 import { BalanceSummary } from '@/components/groups/balance-summary';
 import { BalanceCard } from '@/components/groups/balance-card';
 import { MemberList } from '@/components/groups/member-list';
+import { SettleUpDialog } from '@/components/groups/settle-up-dialog';
+import { PaymentHistory } from '@/components/groups/payment-history';
 import {
   getGroupById,
   getGroupExpenses,
   getGroupBalances,
   getDebts,
+  getSimplifiedDebts,
+  getGroupSettlements,
   updateGroup,
 } from '@/app/actions/groups';
 import { createClient } from '@/lib/supabase/client';
@@ -32,14 +37,29 @@ type ExpenseWithDetails = SharedExpense & {
   splits: ExpenseSplit[];
 };
 
+type SettlementWithDetails = {
+  id: string;
+  amount: number;
+  notes: string | null;
+  created_at: string;
+  from_user: { id: string; full_name: string | null; avatar_url: string | null } | null;
+  to_user: { id: string; full_name: string | null; avatar_url: string | null } | null;
+};
+
+type ActivityItem =
+  | { type: 'expense'; data: ExpenseWithDetails; date: string }
+  | { type: 'settlement'; data: SettlementWithDetails; date: string };
+
 export default function GroupDetailPage() {
   const params = useParams();
   const groupId = params.id as string;
 
   const [group, setGroup] = useState<GroupWithMembers | null>(null);
   const [expenses, setExpenses] = useState<ExpenseWithDetails[]>([]);
+  const [settlements, setSettlements] = useState<SettlementWithDetails[]>([]);
   const [balances, setBalances] = useState<GroupBalance[]>([]);
   const [debts, setDebts] = useState<{ from_user: { id: string; full_name: string | null }; to_user: { id: string; full_name: string | null }; amount: number }[]>([]);
+  const [simplifiedDebts, setSimplifiedDebts] = useState<{ from_user_id: string; to_user_id: string; amount: number; from_user: { id: string; full_name: string | null; avatar_url: string | null } | null; to_user: { id: string; full_name: string | null; avatar_url: string | null } | null }[]>([]);
   const [loading, setLoading] = useState(true);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [currency, setCurrency] = useState('USD');
@@ -75,6 +95,10 @@ export default function GroupDetailPage() {
     const { data: expensesData } = await getGroupExpenses(groupId);
     setExpenses(expensesData || []);
 
+    // Get settlements
+    const { data: settlementsData } = await getGroupSettlements(groupId);
+    setSettlements(settlementsData || []);
+
     // Get balances
     const { data: balancesData } = await getGroupBalances(groupId);
     setBalances(balancesData || []);
@@ -82,6 +106,10 @@ export default function GroupDetailPage() {
     // Get debts
     const { data: debtsData } = await getDebts(groupId);
     setDebts(debtsData || []);
+
+    // Get simplified debts for settlements
+    const { data: simplifiedDebtsData } = await getSimplifiedDebts(groupId);
+    setSimplifiedDebts(simplifiedDebtsData || []);
 
     setLoading(false);
   }, [groupId]);
@@ -103,6 +131,12 @@ export default function GroupDetailPage() {
     style: 'currency',
     currency,
   });
+
+  // Combine expenses and settlements into a sorted activity feed
+  const activityItems: ActivityItem[] = [
+    ...expenses.map((e) => ({ type: 'expense' as const, data: e, date: e.created_at })),
+    ...settlements.map((s) => ({ type: 'settlement' as const, data: s, date: s.created_at })),
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   if (loading) {
     return (
@@ -126,7 +160,7 @@ export default function GroupDetailPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <GroupHeader group={group} onEdit={() => setShowEditDialog(true)} />
+      <GroupHeader group={group} currentUserId={currentUserId} onEdit={() => setShowEditDialog(true)} />
 
       {/* Tabs */}
       <Tabs defaultValue="activity" className="space-y-4">
@@ -147,22 +181,33 @@ export default function GroupDetailPage() {
             </Link>
           </div>
 
-          {expenses.length > 0 ? (
+          {activityItems.length > 0 ? (
             <div className="space-y-3">
-              {expenses.map((expense) => (
-                <SharedExpenseCard
-                  key={expense.id}
-                  expense={expense}
-                  currency={currency}
-                  currentUserId={currentUserId}
-                  onDeleted={loadData}
-                />
-              ))}
+              {activityItems.map((item) =>
+                item.type === 'expense' ? (
+                  <SharedExpenseCard
+                    key={`expense-${item.data.id}`}
+                    expense={item.data}
+                    currency={currency}
+                    currentUserId={currentUserId}
+                    onDeleted={loadData}
+                    simplifiedDebts={simplifiedDebts}
+                  />
+                ) : (
+                  <SettlementCard
+                    key={`settlement-${item.data.id}`}
+                    settlement={item.data}
+                    currency={currency}
+                    currentUserId={currentUserId}
+                    onDeleted={loadData}
+                  />
+                )
+              )}
             </div>
           ) : (
             <Card>
               <CardHeader>
-                <CardTitle className="text-center">No expenses yet</CardTitle>
+                <CardTitle className="text-center">No activity yet</CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                 <Receipt className="w-12 h-12 mx-auto mb-4 text-gray-400" />
@@ -182,10 +227,34 @@ export default function GroupDetailPage() {
 
         {/* Balances Tab */}
         <TabsContent value="balances" className="space-y-4">
+          {/* Settle Up Button */}
+          {group && (
+            <div className="flex justify-end">
+              <SettleUpDialog
+                groupId={groupId}
+                currentUserId={currentUserId}
+                members={group.members.map((m) => ({
+                  user_id: m.user_id,
+                  profile: m.profile,
+                }))}
+                debts={simplifiedDebts}
+                currency={currency}
+                onSettled={loadData}
+              />
+            </div>
+          )}
+
           {balances.length > 0 && (
             <>
               <BalanceSummary
                 balances={balances}
+                currentUserId={currentUserId}
+                currency={currency}
+              />
+
+              {/* Payment History */}
+              <PaymentHistory
+                settlements={settlements}
                 currentUserId={currentUserId}
                 currency={currency}
               />

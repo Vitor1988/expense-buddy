@@ -3,7 +3,8 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { ExpenseGroup, GroupMember, SharedExpense, ExpenseSplit, GroupBalance } from '@/types';
+import type { ExpenseGroup, GroupMember, SharedExpense, ExpenseSplit, GroupBalance, SplitMethod } from '@/types';
+import { calculateSplits, type SplitInput } from '@/lib/split-calculator';
 
 // ============ GROUP CRUD ============
 
@@ -290,6 +291,33 @@ export async function createSharedExpense(groupId: string, formData: FormData) {
     return { error: 'Please select at least one member to split with' };
   }
 
+  // Parse split values for non-equal methods
+  let splitValues: SplitInput[] | undefined;
+  const splitValuesJson = formData.get('split_values') as string;
+  if (splitValuesJson && split_method !== 'equal') {
+    try {
+      splitValues = JSON.parse(splitValuesJson);
+    } catch {
+      return { error: 'Invalid split values data' };
+    }
+  }
+
+  // Calculate splits using the split calculator
+  const splitResult = calculateSplits(
+    split_method as SplitMethod,
+    amount,
+    splitMembers,
+    splitValues
+  );
+
+  if (splitResult.error) {
+    return { error: splitResult.error };
+  }
+
+  if (splitResult.splits.length === 0) {
+    return { error: 'No valid splits calculated' };
+  }
+
   // Create the shared expense
   const { data: expense, error: expenseError } = await supabase
     .from('shared_expenses')
@@ -309,16 +337,13 @@ export async function createSharedExpense(groupId: string, formData: FormData) {
     return { error: expenseError.message };
   }
 
-  // Calculate splits (equal split for MVP)
-  const splitAmount = Math.round((amount / splitMembers.length) * 100) / 100;
-  const remainder = Math.round((amount - splitAmount * splitMembers.length) * 100) / 100;
-
-  const splits = splitMembers.map((memberId, index) => ({
+  // Prepare splits for database
+  const splits = splitResult.splits.map((split) => ({
     shared_expense_id: expense.id,
-    user_id: memberId,
-    amount: index === 0 ? splitAmount + remainder : splitAmount,
-    shares: 1,
-    percentage: Math.round((100 / splitMembers.length) * 100) / 100,
+    user_id: split.userId,
+    amount: split.amount,
+    shares: split.shares,
+    percentage: split.percentage,
     is_settled: false,
   }));
 
@@ -1129,5 +1154,277 @@ export async function leaveGroup(groupId: string) {
   }
 
   revalidatePath('/groups');
+  return { success: true };
+}
+
+// =============================================================================
+// SETTLEMENTS
+// =============================================================================
+
+export async function recordSettlement(
+  groupId: string,
+  toUserId: string,
+  amount: number,
+  notes?: string
+) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Check if user is a member
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    return { error: 'You are not a member of this group' };
+  }
+
+  // Check if recipient is a member
+  const { data: recipientMembership } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', toUserId)
+    .single();
+
+  if (!recipientMembership) {
+    return { error: 'Recipient is not a member of this group' };
+  }
+
+  // Can't settle with yourself
+  if (user.id === toUserId) {
+    return { error: 'Cannot record a settlement to yourself' };
+  }
+
+  // Amount must be positive
+  if (amount <= 0) {
+    return { error: 'Amount must be greater than 0' };
+  }
+
+  const { data, error } = await supabase
+    .from('settlements')
+    .insert({
+      group_id: groupId,
+      from_user_id: user.id,
+      to_user_id: toUserId,
+      amount: Math.round(amount * 100) / 100,
+      notes: notes || null,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/groups/${groupId}`);
+  return { success: true, data };
+}
+
+export async function getGroupSettlements(groupId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated', data: null };
+  }
+
+  // Check if user is a member
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    return { error: 'You are not a member of this group', data: null };
+  }
+
+  const { data, error } = await supabase
+    .from('settlements')
+    .select(`
+      *,
+      from_user:profiles!settlements_from_user_id_profiles_fkey(id, full_name, avatar_url),
+      to_user:profiles!settlements_to_user_id_profiles_fkey(id, full_name, avatar_url)
+    `)
+    .eq('group_id', groupId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { error: error.message, data: null };
+  }
+
+  return { error: null, data };
+}
+
+export async function getSimplifiedDebts(groupId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated', data: null };
+  }
+
+  // Check if user is a member
+  const { data: membership } = await supabase
+    .from('group_members')
+    .select('id')
+    .eq('group_id', groupId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (!membership) {
+    return { error: 'You are not a member of this group', data: null };
+  }
+
+  // Get all shared expenses with splits
+  const { data: expenses, error: expensesError } = await supabase
+    .from('shared_expenses')
+    .select(`
+      id,
+      paid_by,
+      amount,
+      splits:expense_splits(user_id, amount)
+    `)
+    .eq('group_id', groupId);
+
+  if (expensesError) {
+    return { error: expensesError.message, data: null };
+  }
+
+  // Get all settlements
+  const { data: settlements, error: settlementsError } = await supabase
+    .from('settlements')
+    .select('from_user_id, to_user_id, amount')
+    .eq('group_id', groupId);
+
+  if (settlementsError) {
+    return { error: settlementsError.message, data: null };
+  }
+
+  // Get all members for profile info
+  const { data: members } = await supabase
+    .from('group_members')
+    .select('user_id, profile:profiles!inner(id, full_name, avatar_url)')
+    .eq('group_id', groupId);
+
+  // Calculate net balances from expenses
+  const balanceMap = new Map<string, number>();
+
+  expenses?.forEach((expense) => {
+    // Payer is owed money
+    const currentPayerBalance = balanceMap.get(expense.paid_by) || 0;
+    balanceMap.set(expense.paid_by, currentPayerBalance + expense.amount);
+
+    // Each split participant owes
+    expense.splits?.forEach((split: { user_id: string; amount: number }) => {
+      const currentBalance = balanceMap.get(split.user_id) || 0;
+      balanceMap.set(split.user_id, currentBalance - split.amount);
+    });
+  });
+
+  // Adjust balances for settlements
+  settlements?.forEach((settlement) => {
+    // fromUser paid, so they are owed less (or owe more)
+    const fromBalance = balanceMap.get(settlement.from_user_id) || 0;
+    balanceMap.set(settlement.from_user_id, fromBalance + settlement.amount);
+
+    // toUser received, so they are owed more (or owe less)
+    const toBalance = balanceMap.get(settlement.to_user_id) || 0;
+    balanceMap.set(settlement.to_user_id, toBalance - settlement.amount);
+  });
+
+  // Import and use the simplification algorithm
+  const { simplifyDebts } = await import('@/lib/debt-simplification');
+
+  const balances = Array.from(balanceMap.entries()).map(([userId, amount]) => ({
+    userId,
+    amount: Math.round(amount * 100) / 100,
+  }));
+
+  const simplifiedDebts = simplifyDebts(balances);
+
+  // Create member lookup for profile info - profile can be array or object depending on Supabase inference
+  type ProfileInfo = { id: string; full_name: string | null; avatar_url: string | null };
+  const memberLookup = new Map<string, ProfileInfo>();
+  members?.forEach((m) => {
+    const profile = Array.isArray(m.profile) ? m.profile[0] : m.profile;
+    if (profile) {
+      memberLookup.set(m.user_id, profile as ProfileInfo);
+    }
+  });
+
+  // Add profile info to debts
+  const debtsWithProfiles: Array<{
+    from_user_id: string;
+    to_user_id: string;
+    amount: number;
+    from_user: ProfileInfo | null;
+    to_user: ProfileInfo | null;
+  }> = simplifiedDebts.map((debt) => ({
+    from_user_id: debt.fromUserId,
+    to_user_id: debt.toUserId,
+    amount: debt.amount,
+    from_user: memberLookup.get(debt.fromUserId) || null,
+    to_user: memberLookup.get(debt.toUserId) || null,
+  }));
+
+  return { error: null, data: debtsWithProfiles };
+}
+
+export async function deleteSettlement(settlementId: string) {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Get the settlement first
+  const { data: settlement, error: fetchError } = await supabase
+    .from('settlements')
+    .select('group_id, from_user_id')
+    .eq('id', settlementId)
+    .single();
+
+  if (fetchError || !settlement) {
+    return { error: 'Settlement not found' };
+  }
+
+  // Only the person who created the settlement can delete it
+  if (settlement.from_user_id !== user.id) {
+    return { error: 'You can only delete settlements you created' };
+  }
+
+  const { error } = await supabase
+    .from('settlements')
+    .delete()
+    .eq('id', settlementId);
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath(`/groups/${settlement.group_id}`);
   return { success: true };
 }

@@ -18,10 +18,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { MoreVertical, Trash2, Receipt, Loader2 } from 'lucide-react';
+import { MoreVertical, Trash2, Receipt, Loader2, CheckCircle } from 'lucide-react';
 import { deleteSharedExpense } from '@/app/actions/groups';
 import { formatDate } from '@/lib/utils';
 import type { SharedExpense, ExpenseSplit } from '@/types';
+
+interface SimplifiedDebt {
+  from_user_id: string;
+  to_user_id: string;
+  amount: number;
+}
 
 interface SharedExpenseCardProps {
   expense: SharedExpense & {
@@ -31,6 +37,7 @@ interface SharedExpenseCardProps {
   currency: string;
   currentUserId: string;
   onDeleted: () => void;
+  simplifiedDebts?: SimplifiedDebt[];
 }
 
 export function SharedExpenseCard({
@@ -38,6 +45,7 @@ export function SharedExpenseCard({
   currency,
   currentUserId,
   onDeleted,
+  simplifiedDebts = [],
 }: SharedExpenseCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -67,8 +75,16 @@ export function SharedExpenseCard({
 
   const isPayer = expense.paid_by === currentUserId;
   const userSplit = expense.splits?.find((s) => s.user_id === currentUserId);
-  const userOwes = userSplit && !isPayer ? userSplit.amount : 0;
+  const userOwesOriginal = userSplit && !isPayer ? userSplit.amount : 0;
   const userIsOwed = isPayer ? expense.amount - (userSplit?.amount || 0) : 0;
+
+  // Check if user still owes the payer (based on simplified debts)
+  // If there's no debt from current user to payer, the expense is considered settled
+  const stillOwesPayerDebt = simplifiedDebts.find(
+    (d) => d.from_user_id === currentUserId && d.to_user_id === expense.paid_by
+  );
+  const isSettled = userOwesOriginal > 0 && !stillOwesPayerDebt;
+  const userOwes = isSettled ? 0 : userOwesOriginal;
 
   return (
     <>
@@ -102,7 +118,18 @@ export function SharedExpenseCard({
 
             <div className="flex items-center gap-2">
               <div className="text-right">
-                {userOwes > 0 && (
+                {isSettled && (
+                  <div className="flex flex-col items-end">
+                    <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle className="w-4 h-4" />
+                      Settled
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500">
+                      (was {formatter.format(userOwesOriginal)})
+                    </p>
+                  </div>
+                )}
+                {!isSettled && userOwes > 0 && (
                   <p className="text-sm font-medium text-red-600 dark:text-red-400">
                     You owe {formatter.format(userOwes)}
                   </p>
@@ -112,7 +139,7 @@ export function SharedExpenseCard({
                     You get back {formatter.format(userIsOwed)}
                   </p>
                 )}
-                {userOwes === 0 && userIsOwed === 0 && (
+                {!isSettled && userOwes === 0 && userIsOwed === 0 && (
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Not involved
                   </p>

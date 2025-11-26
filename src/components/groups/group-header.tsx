@@ -27,10 +27,15 @@ interface GroupHeaderProps {
   group: ExpenseGroup & {
     members: (GroupMember & { profile: { id: string; full_name: string | null; avatar_url: string | null } })[];
   };
+  currentUserId: string;
   onEdit: () => void;
 }
 
-export function GroupHeader({ group, onEdit }: GroupHeaderProps) {
+export function GroupHeader({ group, currentUserId, onEdit }: GroupHeaderProps) {
+  // Check if current user is an admin
+  const isAdmin = group.members.some(
+    (m) => m.user_id === currentUserId && m.role === 'admin'
+  );
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -104,17 +109,21 @@ export function GroupHeader({ group, onEdit }: GroupHeaderProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
-                <Pencil className="w-4 h-4 mr-2" />
-                Edit Group
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => setShowDeleteDialog(true)}
-                className="text-red-600 dark:text-red-400"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Group
-              </DropdownMenuItem>
+              {isAdmin && (
+                <DropdownMenuItem onClick={onEdit}>
+                  <Pencil className="w-4 h-4 mr-2" />
+                  Edit Group
+                </DropdownMenuItem>
+              )}
+              {isAdmin && (
+                <DropdownMenuItem
+                  onClick={() => setShowDeleteDialog(true)}
+                  className="text-red-600 dark:text-red-400"
+                >
+                  <Trash2 className="w-4 h-4 mr-2" />
+                  Delete Group
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
