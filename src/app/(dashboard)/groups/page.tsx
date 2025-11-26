@@ -3,10 +3,11 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Plus, Users, Loader2 } from 'lucide-react';
+import { Plus, Users } from 'lucide-react';
 import { GroupCard } from '@/components/groups/group-card';
 import { GroupForm } from '@/components/groups/group-form';
 import { PendingInvitationsBanner } from '@/components/groups/pending-invitations-banner';
+import { GroupsListSkeleton } from '@/components/groups/groups-list-skeleton';
 import { createGroup, getGroups, updateGroup } from '@/app/actions/groups';
 import { createClient } from '@/lib/supabase/client';
 import type { ExpenseGroup } from '@/types';
@@ -71,11 +72,7 @@ export default function GroupsPage() {
   };
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-      </div>
-    );
+    return <GroupsListSkeleton />;
   }
 
   // Calculate totals

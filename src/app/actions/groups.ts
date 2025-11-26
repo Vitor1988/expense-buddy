@@ -820,10 +820,14 @@ export async function acceptInvitation(token: string) {
 
   if (existingMember) {
     // Update invitation status anyway
-    await supabase
+    const { error: updateError } = await supabase
       .from('group_invitations')
       .update({ status: 'accepted' })
       .eq('id', invitation.id);
+
+    if (updateError) {
+      console.error('Failed to update invitation status:', updateError);
+    }
     return { success: true, groupId: invitation.group_id };
   }
 
@@ -839,10 +843,14 @@ export async function acceptInvitation(token: string) {
   }
 
   // Update invitation status
-  await supabase
+  const { error: statusUpdateError } = await supabase
     .from('group_invitations')
     .update({ status: 'accepted' })
     .eq('id', invitation.id);
+
+  if (statusUpdateError) {
+    console.error('Failed to update invitation status:', statusUpdateError);
+  }
 
   revalidatePath('/groups');
   revalidatePath(`/groups/${invitation.group_id}`);

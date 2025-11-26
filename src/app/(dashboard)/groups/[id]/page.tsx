@@ -6,8 +6,9 @@ import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, Receipt, Loader2 } from 'lucide-react';
+import { Plus, Receipt } from 'lucide-react';
 import { GroupHeader } from '@/components/groups/group-header';
+import { GroupDetailSkeleton } from '@/components/groups/group-detail-skeleton';
 import { GroupForm } from '@/components/groups/group-form';
 import { SharedExpenseCard } from '@/components/groups/shared-expense-card';
 import { SettlementCard } from '@/components/groups/settlement-card';
@@ -139,11 +140,7 @@ export default function GroupDetailPage() {
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-      </div>
-    );
+    return <GroupDetailSkeleton />;
   }
 
   if (!group) {
