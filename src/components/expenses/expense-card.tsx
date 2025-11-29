@@ -1,23 +1,8 @@
 'use client';
 
-import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { MoreVertical, Pencil, Trash2, Loader2 } from 'lucide-react';
+import { CardActionMenu, DeleteConfirmationDialog } from '@/components/shared';
+import { useDeleteAction } from '@/hooks/use-delete-action';
 import { type Expense, type Category } from '@/types';
 import { deleteExpense } from '@/app/actions/expenses';
 import Link from 'next/link';
@@ -29,23 +14,15 @@ interface ExpenseCardProps {
 }
 
 export function ExpenseCard({ expense, currency = 'USD' }: ExpenseCardProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { showDialog, setShowDialog, handleDelete } = useDeleteAction(
+    deleteExpense,
+    expense.id
+  );
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
   });
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    const result = await deleteExpense(expense.id);
-    if (result?.error) {
-      alert(result.error);
-    }
-    setIsDeleting(false);
-    setShowDeleteDialog(false);
-  };
 
   const category = expense.category;
 
@@ -88,66 +65,26 @@ export function ExpenseCard({ expense, currency = 'USD' }: ExpenseCardProps) {
               <p className="font-semibold text-gray-900 dark:text-white">
                 -{formatter.format(expense.amount)}
               </p>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <Link href={`/expenses/${expense.id}/edit`}>
-                    <DropdownMenuItem>
-                      <Pencil className="w-4 h-4 mr-2" />
-                      Edit
-                    </DropdownMenuItem>
-                  </Link>
-                  <DropdownMenuItem
-                    className="text-red-600"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <CardActionMenu onDelete={() => setShowDialog(true)}>
+                <Link
+                  href={`/expenses/${expense.id}/edit`}
+                  className="relative flex cursor-pointer select-none items-center gap-2 rounded-sm px-2 py-1.5 text-sm outline-none transition-colors hover:bg-accent focus:bg-accent"
+                >
+                  Edit
+                </Link>
+              </CardActionMenu>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Expense</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this expense? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationDialog
+        open={showDialog}
+        onOpenChange={setShowDialog}
+        onConfirm={handleDelete}
+        title="Delete Expense"
+        description="Are you sure you want to delete this expense? This action cannot be undone."
+      />
     </>
   );
 }

@@ -2,24 +2,11 @@
 
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { MoreVertical, Pencil, Trash2, Loader2, Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw } from 'lucide-react';
+import { CardActionMenu, DeleteConfirmationDialog } from '@/components/shared';
+import { useDeleteAction } from '@/hooks/use-delete-action';
 import { type Category, type RecurringExpense } from '@/types';
 import { deleteRecurringExpense, updateRecurringExpense, toggleRecurringExpense } from '@/app/actions/recurring';
 import { RecurringForm } from './recurring-form';
@@ -33,25 +20,17 @@ interface RecurringCardProps {
 }
 
 export function RecurringCard({ recurring, categories, currency = 'USD', onToggle }: RecurringCardProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const { showDialog, setShowDialog, handleDelete } = useDeleteAction(
+    deleteRecurringExpense,
+    recurring.id
+  );
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
   });
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    const result = await deleteRecurringExpense(recurring.id);
-    if (result?.error) {
-      alert(result.error);
-    }
-    setIsDeleting(false);
-    setShowDeleteDialog(false);
-  };
 
   const handleUpdate = async (formData: FormData) => {
     return updateRecurringExpense(recurring.id, formData);
@@ -110,26 +89,10 @@ export function RecurringCard({ recurring, categories, currency = 'USD', onToggl
                 onCheckedChange={handleToggle}
                 disabled={isToggling}
               />
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-red-600"
-                    onClick={() => setShowDeleteDialog(true)}
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              <CardActionMenu
+                onEdit={() => setShowEditDialog(true)}
+                onDelete={() => setShowDialog(true)}
+              />
             </div>
           </div>
 
@@ -162,39 +125,13 @@ export function RecurringCard({ recurring, categories, currency = 'USD', onToggl
       />
 
       {/* Delete Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Recurring Expense</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this recurring expense? This won&apos;t delete any expenses already created from it.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationDialog
+        open={showDialog}
+        onOpenChange={setShowDialog}
+        onConfirm={handleDelete}
+        title="Delete Recurring Expense"
+        description="Are you sure you want to delete this recurring expense? This won't delete any expenses already created from it."
+      />
     </>
   );
 }

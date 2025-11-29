@@ -1,37 +1,27 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { revalidatePath } from 'next/cache';
 
 export async function getBudgets() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
-  const { data, error } = await supabase
+  const { data, error: dbError } = await supabase
     .from('budgets')
     .select('*, category:categories(*)')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  return { data, error: error?.message };
+  return { data, error: dbError?.message };
 }
 
 export async function createBudget(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const amount = parseFloat(formData.get('amount') as string);
@@ -59,15 +49,15 @@ export async function createBudget(formData: FormData) {
     return { error: 'A budget already exists for this category and period' };
   }
 
-  const { error } = await supabase.from('budgets').insert({
+  const { error: dbError } = await supabase.from('budgets').insert({
     user_id: user.id,
     amount,
     category_id: category_id || null,
     period,
   });
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/budgets');
@@ -76,14 +66,9 @@ export async function createBudget(formData: FormData) {
 }
 
 export async function updateBudget(id: string, formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const amount = parseFloat(formData.get('amount') as string);
@@ -94,7 +79,7 @@ export async function updateBudget(id: string, formData: FormData) {
     return { error: 'Please enter a valid amount' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('budgets')
     .update({
       amount,
@@ -104,8 +89,8 @@ export async function updateBudget(id: string, formData: FormData) {
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/budgets');
@@ -114,24 +99,19 @@ export async function updateBudget(id: string, formData: FormData) {
 }
 
 export async function deleteBudget(id: string) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('budgets')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/budgets');
@@ -140,14 +120,9 @@ export async function deleteBudget(id: string) {
 }
 
 export async function getBudgetProgress() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   // Get all budgets with categories

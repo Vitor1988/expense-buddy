@@ -2,23 +2,10 @@
 
 import { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { MoreVertical, Pencil, Trash2, Loader2, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
+import { CardActionMenu, DeleteConfirmationDialog } from '@/components/shared';
+import { useDeleteAction } from '@/hooks/use-delete-action';
 import { type Category } from '@/types';
 import { deleteBudget, updateBudget } from '@/app/actions/budgets';
 import { BudgetForm } from './budget-form';
@@ -44,24 +31,16 @@ interface BudgetCardProps {
 }
 
 export function BudgetCard({ budget, categories, currency = 'USD' }: BudgetCardProps) {
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { showDialog, setShowDialog, handleDelete } = useDeleteAction(
+    deleteBudget,
+    budget.id
+  );
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
   });
-
-  const handleDelete = async () => {
-    setIsDeleting(true);
-    const result = await deleteBudget(budget.id);
-    if (result?.error) {
-      alert(result.error);
-    }
-    setIsDeleting(false);
-    setShowDeleteDialog(false);
-  };
 
   const handleUpdate = async (formData: FormData) => {
     return updateBudget(budget.id, formData);
@@ -99,26 +78,10 @@ export function BudgetCard({ budget, categories, currency = 'USD' }: BudgetCardP
                 </p>
               </div>
             </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="h-8 w-8">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
-                  <Pencil className="w-4 h-4 mr-2" />
-                  Edit
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="text-red-600"
-                  onClick={() => setShowDeleteDialog(true)}
-                >
-                  <Trash2 className="w-4 h-4 mr-2" />
-                  Delete
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <CardActionMenu
+              onEdit={() => setShowEditDialog(true)}
+              onDelete={() => setShowDialog(true)}
+            />
           </div>
 
           <div className="space-y-2">
@@ -172,39 +135,13 @@ export function BudgetCard({ budget, categories, currency = 'USD' }: BudgetCardP
       />
 
       {/* Delete Dialog */}
-      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Delete Budget</DialogTitle>
-            <DialogDescription>
-              Are you sure you want to delete this budget? This action cannot be undone.
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setShowDeleteDialog(false)}
-              disabled={isDeleting}
-            >
-              Cancel
-            </Button>
-            <Button
-              variant="destructive"
-              onClick={handleDelete}
-              disabled={isDeleting}
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Deleting...
-                </>
-              ) : (
-                'Delete'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      <DeleteConfirmationDialog
+        open={showDialog}
+        onOpenChange={setShowDialog}
+        onConfirm={handleDelete}
+        title="Delete Budget"
+        description="Are you sure you want to delete this budget? This action cannot be undone."
+      />
     </>
   );
 }

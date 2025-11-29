@@ -1,16 +1,11 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 
 export async function getSpendingByCategory(startDate: string, endDate: string) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   // Get all expenses in the date range
@@ -46,14 +41,9 @@ export async function getSpendingByCategory(startDate: string, endDate: string) 
 }
 
 export async function getSpendingTrend(startDate: string, endDate: string, groupBy: 'day' | 'week' | 'month' = 'day') {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   const { data: expenses } = await supabase
@@ -102,14 +92,9 @@ export async function getSpendingTrend(startDate: string, endDate: string, group
 }
 
 export async function getMonthlyComparison(months: number = 6) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   const now = new Date();
@@ -139,14 +124,9 @@ export async function getMonthlyComparison(months: number = 6) {
 }
 
 export async function getTopExpenses(startDate: string, endDate: string, limit: number = 10) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   const { data: expenses } = await supabase
@@ -162,14 +142,9 @@ export async function getTopExpenses(startDate: string, endDate: string, limit: 
 }
 
 export async function exportExpenses(startDate: string, endDate: string, format: 'csv' | 'json' = 'csv') {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   const { data: expenses } = await supabase

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -8,21 +9,12 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { MoreVertical, Trash2, Receipt, CheckCircle, Pencil } from 'lucide-react';
+import { MoreVertical, Trash2, Receipt, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { deleteSharedExpense, updateSharedExpense } from '@/app/actions/groups';
+import { deleteSharedExpense } from '@/app/actions/groups';
 import { formatDate } from '@/lib/utils';
-import { SharedExpenseForm } from './shared-expense-form';
 import { DeleteConfirmationDialog, IconBadge } from '@/components/shared';
 import type { SharedExpense, ExpenseSplit, GroupMember } from '@/types';
 
@@ -56,12 +48,8 @@ export function SharedExpenseCard({
   simplifiedDebts = [],
   members = [],
 }: SharedExpenseCardProps) {
+  const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [showEditDialog, setShowEditDialog] = useState(false);
-
-  const canEdit = expense.paid_by === currentUserId || members.some(
-    (m) => m.user_id === currentUserId && m.role === 'admin'
-  );
 
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -77,6 +65,7 @@ export function SharedExpenseCard({
     toast.success('Expense deleted');
     setShowDeleteDialog(false);
     onDeleted();
+    router.refresh();
   };
 
   const payerInitials = expense.payer?.full_name
@@ -162,15 +151,6 @@ export function SharedExpenseCard({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  {canEdit && members.length > 0 && (
-                    <>
-                      <DropdownMenuItem onClick={() => setShowEditDialog(true)}>
-                        <Pencil className="w-4 h-4 mr-2" />
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator />
-                    </>
-                  )}
                   <DropdownMenuItem
                     onClick={() => setShowDeleteDialog(true)}
                     className="text-red-600 dark:text-red-400"
@@ -201,36 +181,6 @@ export function SharedExpenseCard({
         title="Delete Expense"
         description="Are you sure you want to delete this expense? This action cannot be undone."
       />
-
-      {/* Edit Dialog */}
-      {members.length > 0 && (
-        <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
-          <DialogContent className="max-w-2xl max-h-[90vh] p-0">
-            <DialogHeader className="px-6 pt-6 pb-0">
-              <DialogTitle>Edit Expense</DialogTitle>
-            </DialogHeader>
-            <ScrollArea className="max-h-[calc(90vh-80px)] px-6 pb-6">
-              <SharedExpenseForm
-                groupId={expense.group_id}
-                members={members}
-                currentUserId={currentUserId}
-                currency={currency}
-                expense={expense}
-                action={async (formData) => {
-                  const result = await updateSharedExpense(expense.id, formData);
-                  if (result.error) {
-                    return { error: result.error };
-                  }
-                  toast.success('Expense updated');
-                  setShowEditDialog(false);
-                  onDeleted(); // Refresh the list
-                  return { success: true };
-                }}
-              />
-            </ScrollArea>
-          </DialogContent>
-        </Dialog>
-      )}
     </>
   );
 }

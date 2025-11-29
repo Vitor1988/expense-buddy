@@ -580,6 +580,17 @@ export async function deleteSharedExpense(expenseId: string) {
     return { error: 'Only the payer or an admin can delete this expense' };
   }
 
+  // Delete associated splits first (foreign key constraint)
+  const { error: splitsError } = await supabase
+    .from('expense_splits')
+    .delete()
+    .eq('shared_expense_id', expenseId);
+
+  if (splitsError) {
+    return { error: splitsError.message };
+  }
+
+  // Then delete the expense
   const { error } = await supabase
     .from('shared_expenses')
     .delete()

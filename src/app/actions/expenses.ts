@@ -1,20 +1,15 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { formatMonthYear, getMonthDateRange, getPastMonthKeys } from '@/lib/utils';
 import type { MonthlyExpenseData, CategoryBreakdown, Expense } from '@/types';
 
 export async function createExpense(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const amount = parseFloat(formData.get('amount') as string);
@@ -30,7 +25,7 @@ export async function createExpense(formData: FormData) {
     return { error: 'Please enter a valid amount' };
   }
 
-  const { error } = await supabase.from('expenses').insert({
+  const { error: dbError } = await supabase.from('expenses').insert({
     user_id: user.id,
     amount,
     description: description || null,
@@ -41,8 +36,8 @@ export async function createExpense(formData: FormData) {
     tags,
   });
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/dashboard');
@@ -51,14 +46,9 @@ export async function createExpense(formData: FormData) {
 }
 
 export async function updateExpense(id: string, formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const amount = parseFloat(formData.get('amount') as string);
@@ -74,7 +64,7 @@ export async function updateExpense(id: string, formData: FormData) {
     return { error: 'Please enter a valid amount' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('expenses')
     .update({
       amount,
@@ -89,8 +79,8 @@ export async function updateExpense(id: string, formData: FormData) {
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/dashboard');
@@ -99,24 +89,19 @@ export async function updateExpense(id: string, formData: FormData) {
 }
 
 export async function deleteExpense(id: string) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('expenses')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/dashboard');
@@ -130,14 +115,9 @@ export async function getExpenses(filters?: {
   categoryId?: string;
   search?: string;
 }) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   let query = supabase
@@ -162,44 +142,34 @@ export async function getExpenses(filters?: {
     query = query.ilike('description', `%${filters.search}%`);
   }
 
-  const { data, error } = await query;
+  const { data, error: dbError } = await query;
 
-  return { data, error: error?.message };
+  return { data, error: dbError?.message };
 }
 
 export async function getExpenseById(id: string) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
-  const { data, error } = await supabase
+  const { data, error: dbError } = await supabase
     .from('expenses')
     .select('*, category:categories(*)')
     .eq('id', id)
     .eq('user_id', user.id)
     .single();
 
-  return { data, error: error?.message };
+  return { data, error: dbError?.message };
 }
 
 export async function getExpensesByMonth(monthCount: number = 3): Promise<{
   data: MonthlyExpenseData[] | null;
   error: string | null;
 }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   // Get month keys for the past N months
@@ -286,14 +256,9 @@ export async function loadMoreMonths(offset: number, count: number = 3): Promise
   data: MonthlyExpenseData[] | null;
   error: string | null;
 }> {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
   // Get month keys starting from offset

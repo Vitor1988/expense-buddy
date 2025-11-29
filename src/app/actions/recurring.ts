@@ -1,37 +1,27 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { revalidatePath } from 'next/cache';
 
 export async function getRecurringExpenses() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
-  const { data, error } = await supabase
+  const { data, error: dbError } = await supabase
     .from('recurring_expenses')
     .select('*, category:categories(*)')
     .eq('user_id', user.id)
     .order('next_date', { ascending: true });
 
-  return { data, error: error?.message };
+  return { data, error: dbError?.message };
 }
 
 export async function createRecurringExpense(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const amount = parseFloat(formData.get('amount') as string);
@@ -52,7 +42,7 @@ export async function createRecurringExpense(formData: FormData) {
     return { error: 'Please select the next date' };
   }
 
-  const { data: inserted, error } = await supabase
+  const { data: inserted, error: dbError } = await supabase
     .from('recurring_expenses')
     .insert({
       user_id: user.id,
@@ -66,8 +56,8 @@ export async function createRecurringExpense(formData: FormData) {
     .select()
     .single();
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   // If the start date is today or in the past, create the first expense immediately
@@ -114,14 +104,9 @@ export async function createRecurringExpense(formData: FormData) {
 }
 
 export async function updateRecurringExpense(id: string, formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const amount = parseFloat(formData.get('amount') as string);
@@ -135,7 +120,7 @@ export async function updateRecurringExpense(id: string, formData: FormData) {
     return { error: 'Please enter a valid amount' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('recurring_expenses')
     .update({
       amount,
@@ -148,8 +133,8 @@ export async function updateRecurringExpense(id: string, formData: FormData) {
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/recurring');
@@ -157,24 +142,19 @@ export async function updateRecurringExpense(id: string, formData: FormData) {
 }
 
 export async function deleteRecurringExpense(id: string) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('recurring_expenses')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/recurring');
@@ -182,24 +162,19 @@ export async function deleteRecurringExpense(id: string) {
 }
 
 export async function toggleRecurringExpense(id: string, is_active: boolean) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('recurring_expenses')
     .update({ is_active })
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/recurring');
@@ -207,14 +182,9 @@ export async function toggleRecurringExpense(id: string, is_active: boolean) {
 }
 
 export async function processRecurringExpenses() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const today = new Date().toISOString().split('T')[0];

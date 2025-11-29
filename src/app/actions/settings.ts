@@ -1,20 +1,15 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { revalidatePath } from 'next/cache';
 
 export async function getProfile() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
-  const { data: profile, error } = await supabase
+  const { data: profile, error: dbError } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
@@ -22,25 +17,20 @@ export async function getProfile() {
 
   return {
     data: profile ? { ...profile, email: user.email } : null,
-    error: error?.message,
+    error: dbError?.message,
   };
 }
 
 export async function updateProfile(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const full_name = formData.get('full_name') as string;
   const currency = formData.get('currency') as string;
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('profiles')
     .update({
       full_name: full_name || null,
@@ -48,8 +38,8 @@ export async function updateProfile(formData: FormData) {
     })
     .eq('id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   // Update auth metadata
@@ -63,14 +53,9 @@ export async function updateProfile(formData: FormData) {
 }
 
 export async function updatePassword(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const currentPassword = formData.get('current_password') as string;
@@ -99,26 +84,21 @@ export async function updatePassword(formData: FormData) {
     return { error: 'Current password is incorrect' };
   }
 
-  const { error } = await supabase.auth.updateUser({
+  const { error: updateError } = await supabase.auth.updateUser({
     password: newPassword,
   });
 
-  if (error) {
-    return { error: error.message };
+  if (updateError) {
+    return { error: updateError.message };
   }
 
   return { success: true };
 }
 
 export async function deleteAccount() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   // Delete user data (cascades from profile)

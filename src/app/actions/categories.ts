@@ -1,6 +1,6 @@
 'use server';
 
-import { createClient } from '@/lib/supabase/server';
+import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { revalidatePath } from 'next/cache';
 
 const DEFAULT_CATEGORIES = [
@@ -17,34 +17,24 @@ const DEFAULT_CATEGORIES = [
 ];
 
 export async function getCategories() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { data: null, error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, error: error || 'Not authenticated' };
   }
 
-  const { data, error } = await supabase
+  const { data, error: dbError } = await supabase
     .from('categories')
     .select('*')
     .eq('user_id', user.id)
     .order('name');
 
-  return { data, error: error?.message };
+  return { data, error: dbError?.message };
 }
 
 export async function createDefaultCategories() {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   // Check if user already has categories
@@ -64,10 +54,10 @@ export async function createDefaultCategories() {
     is_default: true,
   }));
 
-  const { error } = await supabase.from('categories').insert(categories);
+  const { error: dbError } = await supabase.from('categories').insert(categories);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/expenses');
@@ -76,14 +66,9 @@ export async function createDefaultCategories() {
 }
 
 export async function createCategory(formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const name = formData.get('name') as string;
@@ -94,7 +79,7 @@ export async function createCategory(formData: FormData) {
     return { error: 'Category name is required' };
   }
 
-  const { error } = await supabase.from('categories').insert({
+  const { error: dbError } = await supabase.from('categories').insert({
     user_id: user.id,
     name,
     icon: icon || null,
@@ -102,8 +87,8 @@ export async function createCategory(formData: FormData) {
     is_default: false,
   });
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/expenses');
@@ -112,14 +97,9 @@ export async function createCategory(formData: FormData) {
 }
 
 export async function updateCategory(id: string, formData: FormData) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   const name = formData.get('name') as string;
@@ -130,7 +110,7 @@ export async function updateCategory(id: string, formData: FormData) {
     return { error: 'Category name is required' };
   }
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('categories')
     .update({
       name,
@@ -140,8 +120,8 @@ export async function updateCategory(id: string, formData: FormData) {
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/expenses');
@@ -150,14 +130,9 @@ export async function updateCategory(id: string, formData: FormData) {
 }
 
 export async function deleteCategory(id: string) {
-  const supabase = await createClient();
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    return { error: 'Not authenticated' };
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
   }
 
   // Set expenses with this category to null
@@ -167,14 +142,14 @@ export async function deleteCategory(id: string) {
     .eq('category_id', id)
     .eq('user_id', user.id);
 
-  const { error } = await supabase
+  const { error: dbError } = await supabase
     .from('categories')
     .delete()
     .eq('id', id)
     .eq('user_id', user.id);
 
-  if (error) {
-    return { error: error.message };
+  if (dbError) {
+    return { error: dbError.message };
   }
 
   revalidatePath('/expenses');
