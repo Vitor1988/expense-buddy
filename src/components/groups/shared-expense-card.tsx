@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -50,6 +50,8 @@ export function SharedExpenseCard({
 }: SharedExpenseCardProps) {
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -144,13 +146,28 @@ export function SharedExpenseCard({
                   </p>
                 )}
               </div>
-              <DropdownMenu>
+              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-10 w-10 mobile-menu-trigger touch-manipulation"
-                    onPointerDown={(e) => e.stopPropagation()}
+                    className="h-8 w-8"
+                    onTouchStart={(e) => {
+                      touchStartRef.current = {
+                        x: e.touches[0].clientX,
+                        y: e.touches[0].clientY,
+                      };
+                    }}
+                    onTouchEnd={(e) => {
+                      if (!touchStartRef.current) return;
+                      const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+                      const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+                      if (deltaX > 10 || deltaY > 10) {
+                        e.preventDefault();
+                        setMenuOpen(false);
+                      }
+                      touchStartRef.current = null;
+                    }}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>

@@ -4,6 +4,9 @@
  * Reusable dropdown menu for card actions (Edit, Delete, etc.).
  * Use this component in card components that need action buttons.
  *
+ * Includes scroll-aware touch handling to prevent accidental menu opens
+ * during scroll gestures on mobile devices.
+ *
  * @module components/shared/card-action-menu
  * @see MODULES.md for full documentation
  *
@@ -33,6 +36,7 @@
  * </CardActionMenu>
  */
 
+import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -65,19 +69,38 @@ export function CardActionMenu({
   children,
   className = '',
 }: CardActionMenuProps) {
+  const [open, setOpen] = useState(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
   // Don't render if no actions
   if (!onEdit && !onDelete && !children) {
     return null;
   }
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
           size="icon"
-          className={`h-10 w-10 mobile-menu-trigger touch-manipulation ${className}`}
-          onPointerDown={(e) => e.stopPropagation()}
+          className={`h-8 w-8 ${className}`}
+          onTouchStart={(e) => {
+            touchStartRef.current = {
+              x: e.touches[0].clientX,
+              y: e.touches[0].clientY,
+            };
+          }}
+          onTouchEnd={(e) => {
+            if (!touchStartRef.current) return;
+            const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
+            const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
+            // If moved more than 10px, it was a scroll - prevent menu from opening
+            if (deltaX > 10 || deltaY > 10) {
+              e.preventDefault();
+              setOpen(false);
+            }
+            touchStartRef.current = null;
+          }}
         >
           <MoreVertical className="w-4 h-4" />
           <span className="sr-only">Open menu</span>
