@@ -2,10 +2,13 @@ import { createClient } from '@/lib/supabase/server';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
-import { Plus, Receipt } from 'lucide-react';
+import { Plus, Receipt, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ExpenseCard } from '@/components/expenses/expense-card';
 import { ExpenseFilters } from '@/components/expenses/expense-filters';
 import { getCategories, createDefaultCategories } from '@/app/actions/categories';
+import { getExpensesPaginated } from '@/app/actions/expenses';
+
+const ITEMS_PER_PAGE = 20;
 
 interface ExpensesPageProps {
   searchParams: Promise<{
@@ -13,6 +16,7 @@ interface ExpensesPageProps {
     category?: string;
     startDate?: string;
     endDate?: string;
+    page?: string;
   }>;
 }
 
@@ -40,33 +44,33 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
     categories = result.data;
   }
 
-  // Build query for expenses
-  let query = supabase
-    .from('expenses')
-    .select('*, category:categories(*)')
-    .eq('user_id', user?.id)
-    .order('date', { ascending: false });
+  // Get current page from params
+  const currentPage = params?.page ? parseInt(params.page, 10) : 1;
 
-  if (params?.search) {
-    query = query.ilike('description', `%${params.search}%`);
-  }
+  // Fetch paginated expenses
+  const { data: expenses, total = 0, totalPages = 1 } = await getExpensesPaginated({
+    search: params?.search,
+    categoryId: params?.category,
+    startDate: params?.startDate,
+    endDate: params?.endDate,
+    page: currentPage,
+    limit: ITEMS_PER_PAGE,
+  });
 
-  if (params?.category) {
-    query = query.eq('category_id', params.category);
-  }
-
-  if (params?.startDate) {
-    query = query.gte('date', params.startDate);
-  }
-
-  if (params?.endDate) {
-    query = query.lte('date', params.endDate);
-  }
-
-  const { data: expenses } = await query;
-
-  // Calculate totals for filtered results
+  // Calculate totals for current page
   const totalAmount = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+
+  // Build pagination URLs
+  const buildPageUrl = (page: number) => {
+    const urlParams = new URLSearchParams();
+    if (params?.search) urlParams.set('search', params.search);
+    if (params?.category) urlParams.set('category', params.category);
+    if (params?.startDate) urlParams.set('startDate', params.startDate);
+    if (params?.endDate) urlParams.set('endDate', params.endDate);
+    if (page > 1) urlParams.set('page', page.toString());
+    const queryString = urlParams.toString();
+    return `/expenses${queryString ? `?${queryString}` : ''}`;
+  };
   const currency = profile?.currency || 'USD';
   const formatter = new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -97,7 +101,9 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                Total ({expenses?.length || 0} expenses)
+                {total > ITEMS_PER_PAGE
+                  ? `Showing ${(currentPage - 1) * ITEMS_PER_PAGE + 1}-${Math.min(currentPage * ITEMS_PER_PAGE, total)} of ${total} expenses`
+                  : `Total (${total} expenses)`}
               </p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white">
                 {formatter.format(totalAmount)}
@@ -151,6 +157,61 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
             </Link>
           </CardContent>
         </Card>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2">
+          <Link href={buildPageUrl(currentPage - 1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={currentPage === 1}
+              className={currentPage === 1 ? 'pointer-events-none opacity-50' : ''}
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </Button>
+          </Link>
+          <div className="flex items-center gap-1">
+            {Array.from({ length: totalPages }, (_, i) => i + 1)
+              .filter((page) => {
+                // Show first, last, current, and pages around current
+                if (page === 1 || page === totalPages) return true;
+                if (Math.abs(page - currentPage) <= 1) return true;
+                return false;
+              })
+              .map((page, index, array) => {
+                // Add ellipsis if there's a gap
+                const showEllipsisBefore = index > 0 && page - array[index - 1] > 1;
+                return (
+                  <span key={page} className="flex items-center gap-1">
+                    {showEllipsisBefore && (
+                      <span className="px-2 text-gray-400">...</span>
+                    )}
+                    <Link href={buildPageUrl(page)}>
+                      <Button
+                        variant={page === currentPage ? 'default' : 'outline'}
+                        size="icon"
+                        className={page === currentPage ? 'bg-emerald-500 hover:bg-emerald-600' : ''}
+                      >
+                        {page}
+                      </Button>
+                    </Link>
+                  </span>
+                );
+              })}
+          </div>
+          <Link href={buildPageUrl(currentPage + 1)}>
+            <Button
+              variant="outline"
+              size="icon"
+              disabled={currentPage === totalPages}
+              className={currentPage === totalPages ? 'pointer-events-none opacity-50' : ''}
+            >
+              <ChevronRight className="w-4 h-4" />
+            </Button>
+          </Link>
+        </div>
       )}
     </div>
   );

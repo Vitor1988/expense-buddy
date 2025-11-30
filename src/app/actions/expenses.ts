@@ -147,6 +147,71 @@ export async function getExpenses(filters?: {
   return { data, error: dbError?.message };
 }
 
+export async function getExpensesPaginated(filters?: {
+  startDate?: string;
+  endDate?: string;
+  categoryId?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}) {
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, total: 0, error: error || 'Not authenticated' };
+  }
+
+  const page = filters?.page || 1;
+  const limit = filters?.limit || 20;
+  const offset = (page - 1) * limit;
+
+  // Build base query for counting
+  let countQuery = supabase
+    .from('expenses')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', user.id);
+
+  // Build data query
+  let dataQuery = supabase
+    .from('expenses')
+    .select('*, category:categories(*)')
+    .eq('user_id', user.id)
+    .order('date', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  // Apply filters to both queries
+  if (filters?.startDate) {
+    countQuery = countQuery.gte('date', filters.startDate);
+    dataQuery = dataQuery.gte('date', filters.startDate);
+  }
+
+  if (filters?.endDate) {
+    countQuery = countQuery.lte('date', filters.endDate);
+    dataQuery = dataQuery.lte('date', filters.endDate);
+  }
+
+  if (filters?.categoryId) {
+    countQuery = countQuery.eq('category_id', filters.categoryId);
+    dataQuery = dataQuery.eq('category_id', filters.categoryId);
+  }
+
+  if (filters?.search) {
+    countQuery = countQuery.ilike('description', `%${filters.search}%`);
+    dataQuery = dataQuery.ilike('description', `%${filters.search}%`);
+  }
+
+  // Execute both queries in parallel
+  const [countResult, dataResult] = await Promise.all([countQuery, dataQuery]);
+
+  return {
+    data: dataResult.data,
+    total: countResult.count || 0,
+    page,
+    limit,
+    totalPages: Math.ceil((countResult.count || 0) / limit),
+    error: dataResult.error?.message || countResult.error?.message,
+  };
+}
+
 export async function getExpenseById(id: string) {
   const { user, supabase, error } = await getAuthenticatedUser();
   if (error || !user || !supabase) {

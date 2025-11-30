@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -81,13 +81,13 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
   };
 
   // Sort members: current user first, then admins, then by name
-  const sortedMembers = [...members].sort((a, b) => {
+  const sortedMembers = useMemo(() => [...members].sort((a, b) => {
     if (a.user_id === currentUserId) return -1;
     if (b.user_id === currentUserId) return 1;
     if (a.role === 'admin' && b.role !== 'admin') return -1;
     if (a.role !== 'admin' && b.role === 'admin') return 1;
     return (a.profile?.full_name || '').localeCompare(b.profile?.full_name || '');
-  });
+  }), [members, currentUserId]);
 
   return (
     <div className="space-y-4">

@@ -62,8 +62,8 @@ export function ExpenseCard({ expense, currency = 'USD' }: ExpenseCardProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <p className="font-semibold text-gray-900 dark:text-white">
-                -{formatter.format(expense.amount)}
+              <p className="font-semibold text-gray-900 dark:text-white whitespace-nowrap">
+                {formatter.format(expense.amount)}
               </p>
               <CardActionMenu onDelete={() => setShowDialog(true)}>
                 <Link

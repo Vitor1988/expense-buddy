@@ -17,6 +17,7 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { type CurrencyCode } from '@/types';
+import { ErrorBoundary } from '@/components/shared';
 
 // Chart skeleton component for loading state
 function ChartSkeleton() {
@@ -367,11 +368,17 @@ export default function ReportsPage() {
 
       {/* Charts */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SpendingPieChart data={categoryData} currency={currency} />
-        <SpendingTrendChart data={trendData} currency={currency} />
+        <ErrorBoundary>
+          <SpendingPieChart data={categoryData} currency={currency} />
+        </ErrorBoundary>
+        <ErrorBoundary>
+          <SpendingTrendChart data={trendData} currency={currency} />
+        </ErrorBoundary>
       </div>
 
-      <MonthlyComparisonChart data={monthlyData} currency={currency} />
+      <ErrorBoundary>
+        <MonthlyComparisonChart data={monthlyData} currency={currency} />
+      </ErrorBoundary>
 
       {/* Top Expenses */}
       <Card>

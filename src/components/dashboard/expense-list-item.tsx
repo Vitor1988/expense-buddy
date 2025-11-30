@@ -37,8 +37,8 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
       </div>
 
       {/* Amount */}
-      <span className="text-sm font-semibold text-gray-900 dark:text-white ml-4 flex-shrink-0">
-        -{formatCurrency(expense.amount, currency)}
+      <span className="text-sm font-semibold text-gray-900 dark:text-white ml-4 flex-shrink-0 whitespace-nowrap">
+        {formatCurrency(expense.amount, currency)}
       </span>
     </div>
   );

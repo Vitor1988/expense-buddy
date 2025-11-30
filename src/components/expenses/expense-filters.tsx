@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Search, X } from 'lucide-react';
 import { type Category } from '@/types';
-import { useCallback } from 'react';
+import { useCallback, useRef } from 'react';
 
 interface ExpenseFiltersProps {
   categories: Category[];
@@ -21,6 +21,7 @@ interface ExpenseFiltersProps {
 export function ExpenseFilters({ categories }: ExpenseFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const searchTimeoutRef = useRef<NodeJS.Timeout>();
 
   const updateFilters = useCallback(
     (key: string, value: string | null) => {
@@ -56,11 +57,14 @@ export function ExpenseFilters({ categories }: ExpenseFiltersProps) {
           defaultValue={searchParams.get('search') || ''}
           onChange={(e) => {
             const value = e.target.value;
+            // Clear previous timeout
+            if (searchTimeoutRef.current) {
+              clearTimeout(searchTimeoutRef.current);
+            }
             // Debounce the search
-            const timeout = setTimeout(() => {
+            searchTimeoutRef.current = setTimeout(() => {
               updateFilters('search', value || null);
             }, 300);
-            return () => clearTimeout(timeout);
           }}
         />
       </div>
@@ -91,14 +95,14 @@ export function ExpenseFilters({ categories }: ExpenseFiltersProps) {
       {/* Date Range */}
       <Input
         type="date"
-        className="w-full sm:w-auto"
+        className="w-full sm:w-[180px]"
         placeholder="Start Date"
         value={searchParams.get('startDate') || ''}
         onChange={(e) => updateFilters('startDate', e.target.value || null)}
       />
       <Input
         type="date"
-        className="w-full sm:w-auto"
+        className="w-full sm:w-[180px]"
         placeholder="End Date"
         value={searchParams.get('endDate') || ''}
         onChange={(e) => updateFilters('endDate', e.target.value || null)}

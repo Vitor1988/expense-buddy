@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -135,10 +135,10 @@ export default function GroupDetailPage() {
   });
 
   // Combine expenses and settlements into a sorted activity feed
-  const activityItems: ActivityItem[] = [
+  const activityItems = useMemo<ActivityItem[]>(() => [
     ...expenses.map((e) => ({ type: 'expense' as const, data: e, date: e.created_at })),
     ...settlements.map((s) => ({ type: 'settlement' as const, data: s, date: s.created_at })),
-  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()), [expenses, settlements]);
 
   if (loading) {
     return <GroupDetailSkeleton />;

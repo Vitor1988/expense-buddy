@@ -129,12 +129,12 @@ export function SharedExpenseCard({
                   </div>
                 )}
                 {!isSettled && userOwes > 0 && (
-                  <p className="text-sm font-medium text-red-600 dark:text-red-400">
+                  <p className="text-sm font-medium text-red-600 dark:text-red-400 whitespace-nowrap">
                     You owe {formatter.format(userOwes)}
                   </p>
                 )}
                 {userIsOwed > 0 && (
-                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400">
+                  <p className="text-sm font-medium text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
                     You get back {formatter.format(userIsOwed)}
                   </p>
                 )}

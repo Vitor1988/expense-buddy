@@ -49,7 +49,7 @@ export function BalanceCard({ balance, currency, isCurrentUser }: BalanceCardPro
           </div>
           <div className="text-right">
             <p
-              className={`font-semibold ${
+              className={`font-semibold whitespace-nowrap ${
                 balance.net_balance > 0
                   ? 'text-emerald-600 dark:text-emerald-400'
                   : balance.net_balance < 0
