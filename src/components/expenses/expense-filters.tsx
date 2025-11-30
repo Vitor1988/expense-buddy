@@ -92,21 +92,23 @@ export function ExpenseFilters({ categories }: ExpenseFiltersProps) {
         </SelectContent>
       </Select>
 
-      {/* Date Range */}
-      <Input
-        type="date"
-        className="w-full sm:w-[180px]"
-        placeholder="Start Date"
-        value={searchParams.get('startDate') || ''}
-        onChange={(e) => updateFilters('startDate', e.target.value || null)}
-      />
-      <Input
-        type="date"
-        className="w-full sm:w-[180px]"
-        placeholder="End Date"
-        value={searchParams.get('endDate') || ''}
-        onChange={(e) => updateFilters('endDate', e.target.value || null)}
-      />
+      {/* Date Range - side by side on mobile */}
+      <div className="flex gap-2 w-full sm:w-auto sm:contents">
+        <Input
+          type="date"
+          className="flex-1 sm:flex-none sm:w-[180px]"
+          placeholder="Start Date"
+          value={searchParams.get('startDate') || ''}
+          onChange={(e) => updateFilters('startDate', e.target.value || null)}
+        />
+        <Input
+          type="date"
+          className="flex-1 sm:flex-none sm:w-[180px]"
+          placeholder="End Date"
+          value={searchParams.get('endDate') || ''}
+          onChange={(e) => updateFilters('endDate', e.target.value || null)}
+        />
+      </div>
 
       {/* Clear Filters */}
       {hasFilters && (
