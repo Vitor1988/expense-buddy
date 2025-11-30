@@ -1,5 +1,6 @@
 'use client';
 
+import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -28,6 +29,8 @@ interface RecurringFormProps {
 }
 
 export function RecurringForm({ categories, recurring, action, open, onOpenChange, currency = 'USD' }: RecurringFormProps) {
+  const { toast } = useToast();
+
   const handleSubmit = async (formData: FormData) => {
     if (recurring) {
       formData.set('is_active', recurring.is_active ? 'true' : 'false');
@@ -36,7 +39,11 @@ export function RecurringForm({ categories, recurring, action, open, onOpenChang
     if (result?.success) {
       onOpenChange(false);
     } else if (result?.error) {
-      alert(result.error);
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      });
     }
   };
 

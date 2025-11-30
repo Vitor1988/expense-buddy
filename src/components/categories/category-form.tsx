@@ -1,5 +1,6 @@
 'use client';
 
+import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -26,12 +27,18 @@ const COLOR_OPTIONS = [
 ];
 
 export function CategoryForm({ category, action, open, onOpenChange }: CategoryFormProps) {
+  const { toast } = useToast();
+
   const handleSubmit = async (formData: FormData) => {
     const result = await action(formData);
     if (result?.success) {
       onOpenChange(false);
     } else if (result?.error) {
-      alert(result.error);
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      });
     }
   };
 

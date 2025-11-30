@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
 import { Camera, Upload, X, Loader2, Image as ImageIcon } from 'lucide-react';
@@ -15,6 +16,7 @@ export function ReceiptUpload({ currentUrl, onUpload, expenseId: _expenseId }: R
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState<string | null>(currentUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -22,13 +24,21 @@ export function ReceiptUpload({ currentUrl, onUpload, expenseId: _expenseId }: R
 
     // Validate file type
     if (!file.type.startsWith('image/')) {
-      alert('Please select an image file');
+      toast({
+        title: 'Invalid File',
+        description: 'Please select an image file',
+        variant: 'destructive',
+      });
       return;
     }
 
     // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      alert('File size must be less than 5MB');
+      toast({
+        title: 'File Too Large',
+        description: 'File size must be less than 5MB',
+        variant: 'destructive',
+      });
       return;
     }
 
@@ -58,9 +68,12 @@ export function ReceiptUpload({ currentUrl, onUpload, expenseId: _expenseId }: R
 
       setPreview(publicUrl);
       onUpload(publicUrl);
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      alert('Failed to upload receipt. Please try again.');
+    } catch {
+      toast({
+        title: 'Upload Failed',
+        description: 'Failed to upload receipt. Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setUploading(false);
     }
@@ -74,8 +87,8 @@ export function ReceiptUpload({ currentUrl, onUpload, expenseId: _expenseId }: R
         const urlParts = preview.split('/');
         const filePath = `receipts/${urlParts[urlParts.length - 1]}`;
         await supabase.storage.from('receipts').remove([filePath]);
-      } catch (error) {
-        console.error('Error removing file:', error);
+      } catch {
+        // Silent fail for file removal
       }
     }
     setPreview(null);

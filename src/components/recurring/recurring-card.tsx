@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ interface RecurringCardProps {
 export function RecurringCard({ recurring, categories, currency = 'USD', onToggle }: RecurringCardProps) {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [isToggling, setIsToggling] = useState(false);
+  const { toast } = useToast();
   const { showDialog, setShowDialog, handleDelete } = useDeleteAction(
     deleteRecurringExpense,
     recurring.id
@@ -40,7 +42,11 @@ export function RecurringCard({ recurring, categories, currency = 'USD', onToggl
     setIsToggling(true);
     const result = await toggleRecurringExpense(recurring.id, !recurring.is_active);
     if (result?.error) {
-      alert(result.error);
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      });
     }
     onToggle?.();
     setIsToggling(false);

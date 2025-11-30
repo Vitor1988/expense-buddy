@@ -50,7 +50,7 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     });
 
     if (profileError) {
-      console.error('Error creating profile:', profileError);
+      // Profile creation failed - user may need to create profile manually later
     }
 
     // Create default categories for the user

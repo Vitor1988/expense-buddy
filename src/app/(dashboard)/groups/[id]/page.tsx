@@ -102,10 +102,8 @@ export default function GroupDetailPage() {
     ]);
 
     // Extract data from results
-    const { data: groupData, error: groupError } = groupResult;
-    if (groupError) {
-      console.error('Error loading group:', groupError);
-    } else {
+    const { data: groupData } = groupResult;
+    if (groupData) {
       setGroup(groupData);
     }
 

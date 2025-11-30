@@ -36,6 +36,17 @@ src/
 │   ├── ui/                # shadcn/ui components
 │   ├── expenses/          # Expense-related components
 │   ├── budgets/           # Budget-related components
+│   │   ├── budget-form.tsx
+│   │   └── budgets-page-client.tsx  # Client wrapper for server component
+│   ├── categories/        # Category-related components
+│   │   ├── category-form.tsx
+│   │   └── categories-page-client.tsx  # Client wrapper for server component
+│   ├── recurring/         # Recurring expense components
+│   │   ├── recurring-form.tsx
+│   │   ├── recurring-card.tsx
+│   │   └── recurring-page-client.tsx  # Client wrapper for server component
+│   ├── settings/          # Settings components
+│   │   └── settings-page-client.tsx  # Client wrapper for server component
 │   ├── groups/            # Shared expenses components
 │   │   ├── group-card.tsx
 │   │   ├── group-form.tsx
@@ -166,8 +177,9 @@ npm run lint     # Run ESLint
 - [x] Activity feed with settlements
 
 ### Phase 5: Polish - IN PROGRESS
-- [ ] Toast notifications for all actions
+- [x] Toast notifications for all actions
 - [x] Skeleton loaders
+- [x] Server components for faster page loads (budgets, categories, recurring, settings)
 - [ ] Edge case handling
 - [ ] Dashboard groups balance widget
 - [ ] Mobile UX improvements

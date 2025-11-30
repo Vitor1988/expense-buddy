@@ -23,7 +23,6 @@ export function MonthlyExpenseSection({ initialData, currency }: MonthlyExpenseS
       const { data, error } = await loadMoreMonths(months.length, 3);
 
       if (error) {
-        console.error('Failed to load more months:', error);
         return;
       }
 

@@ -91,7 +91,7 @@ export function Header({ user }: HeaderProps) {
         {/* Mobile Menu */}
         <Sheet>
           <SheetTrigger asChild className="md:hidden">
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="Open navigation menu">
               <Menu className="h-5 w-5" />
             </Button>
           </SheetTrigger>
@@ -144,6 +144,7 @@ export function Header({ user }: HeaderProps) {
             size="icon"
             onClick={toggleDark}
             className="rounded-full"
+            aria-label={isDark ? 'Switch to light mode' : 'Switch to dark mode'}
           >
             {isDark ? (
               <Sun className="h-5 w-5" />

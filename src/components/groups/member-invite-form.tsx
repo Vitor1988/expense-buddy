@@ -101,6 +101,7 @@ export function MemberInviteForm({ groupId, isAdmin }: MemberInviteFormProps) {
                   variant="outline"
                   size="icon"
                   onClick={copyLink}
+                  aria-label={copied ? 'Link copied' : 'Copy invite link'}
                 >
                   {copied ? (
                     <Check className="w-4 h-4 text-emerald-500" />

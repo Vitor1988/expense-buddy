@@ -42,10 +42,8 @@ export default function NewSharedExpensePage() {
     }
 
     // Get group details
-    const { data: groupData, error } = await getGroupById(groupId);
-    if (error) {
-      console.error('Error loading group:', error);
-    } else {
+    const { data: groupData } = await getGroupById(groupId);
+    if (groupData) {
       setGroup(groupData);
     }
 

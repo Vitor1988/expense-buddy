@@ -1,5 +1,6 @@
 'use client';
 
+import { useToast } from '@/hooks/use-toast';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -34,12 +35,18 @@ interface BudgetFormProps {
 }
 
 export function BudgetForm({ categories, budget, action, open, onOpenChange, currency = 'USD' }: BudgetFormProps) {
+  const { toast } = useToast();
+
   const handleSubmit = async (formData: FormData) => {
     const result = await action(formData);
     if (result?.success) {
       onOpenChange(false);
     } else if (result?.error) {
-      alert(result.error);
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      });
     }
   };
 

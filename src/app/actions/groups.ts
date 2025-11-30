@@ -1,5 +1,6 @@
 'use server';
 
+import { randomBytes } from 'crypto';
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
@@ -848,12 +849,7 @@ export async function getDebts(groupId: string): Promise<{
 // ============ INVITATIONS ============
 
 function generateInviteToken(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-  let token = '';
-  for (let i = 0; i < 32; i++) {
-    token += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return token;
+  return randomBytes(24).toString('base64url');
 }
 
 export async function sendInvitation(groupId: string, email: string) {
@@ -1035,14 +1031,11 @@ export async function acceptInvitation(token: string) {
 
   if (existingMember) {
     // Update invitation status anyway
-    const { error: updateError } = await supabase
+    await supabase
       .from('group_invitations')
       .update({ status: 'accepted' })
       .eq('id', invitation.id);
 
-    if (updateError) {
-      console.error('Failed to update invitation status:', updateError);
-    }
     return { success: true, groupId: invitation.group_id };
   }
 
@@ -1058,14 +1051,10 @@ export async function acceptInvitation(token: string) {
   }
 
   // Update invitation status
-  const { error: statusUpdateError } = await supabase
+  await supabase
     .from('group_invitations')
     .update({ status: 'accepted' })
     .eq('id', invitation.id);
-
-  if (statusUpdateError) {
-    console.error('Failed to update invitation status:', statusUpdateError);
-  }
 
   revalidatePath('/groups');
   revalidatePath(`/groups/${invitation.group_id}`);

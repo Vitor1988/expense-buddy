@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -19,6 +20,7 @@ interface ExpenseFormProps {
 
 export function ExpenseForm({ categories, expense, action, currency = 'USD' }: ExpenseFormProps) {
   const [receiptUrl, setReceiptUrl] = useState<string | null>(expense?.receipt_url || null);
+  const { toast } = useToast();
 
   const handleSubmit = async (formData: FormData) => {
     // Add receipt URL to form data
@@ -30,7 +32,11 @@ export function ExpenseForm({ categories, expense, action, currency = 'USD' }: E
 
     const result = await action(formData);
     if (result?.error) {
-      alert(result.error);
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      });
     }
   };
 
