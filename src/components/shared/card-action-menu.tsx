@@ -36,7 +36,6 @@
  * </CardActionMenu>
  */
 
-import { useState, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -45,6 +44,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
+import { useScrollAwareMenu } from '@/hooks/use-scroll-aware-menu';
 
 export interface CardActionMenuProps {
   /** Handler for edit action (if omitted, edit item is not shown) */
@@ -69,8 +69,7 @@ export function CardActionMenu({
   children,
   className = '',
 }: CardActionMenuProps) {
-  const [open, setOpen] = useState(false);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const { open, setOpen, triggerProps } = useScrollAwareMenu();
 
   // Don't render if no actions
   if (!onEdit && !onDelete && !children) {
@@ -84,23 +83,7 @@ export function CardActionMenu({
           variant="ghost"
           size="icon"
           className={`h-8 w-8 ${className}`}
-          onTouchStart={(e) => {
-            touchStartRef.current = {
-              x: e.touches[0].clientX,
-              y: e.touches[0].clientY,
-            };
-          }}
-          onTouchEnd={(e) => {
-            if (!touchStartRef.current) return;
-            const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
-            const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-            // If moved more than 10px, it was a scroll - prevent menu from opening
-            if (deltaX > 10 || deltaY > 10) {
-              e.preventDefault();
-              setOpen(false);
-            }
-            touchStartRef.current = null;
-          }}
+          {...triggerProps}
         >
           <MoreVertical className="w-4 h-4" />
           <span className="sr-only">Open menu</span>

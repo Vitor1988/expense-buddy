@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo } from 'react';
+import { useScrollAwareMenu } from '@/hooks/use-scroll-aware-menu';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,8 +35,7 @@ interface GroupCardProps {
 export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [menuOpen, setMenuOpen] = useState(false);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const { open: menuOpen, setOpen: setMenuOpen, triggerProps } = useScrollAwareMenu();
 
   const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -116,22 +116,7 @@ export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    onTouchStart={(e) => {
-                      touchStartRef.current = {
-                        x: e.touches[0].clientX,
-                        y: e.touches[0].clientY,
-                      };
-                    }}
-                    onTouchEnd={(e) => {
-                      if (!touchStartRef.current) return;
-                      const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
-                      const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-                      if (deltaX > 10 || deltaY > 10) {
-                        e.preventDefault();
-                        setMenuOpen(false);
-                      }
-                      touchStartRef.current = null;
-                    }}
+                    {...triggerProps}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>

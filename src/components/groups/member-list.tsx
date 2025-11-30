@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
+import { useScrollAwareMenu } from '@/hooks/use-scroll-aware-menu';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -29,8 +30,8 @@ interface MemberListProps {
 export function MemberList({ groupId, members, currentUserId }: MemberListProps) {
   const [pendingInvites, setPendingInvites] = useState<{ id: string; invited_email: string; created_at: string; token: string }[]>([]);
   const [loading, setLoading] = useState(false);
+  const { triggerProps } = useScrollAwareMenu();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Check if current user is admin
   const currentMember = members.find((m) => m.user_id === currentUserId);
@@ -197,22 +198,7 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            onTouchStart={(e) => {
-                              touchStartRef.current = {
-                                x: e.touches[0].clientX,
-                                y: e.touches[0].clientY,
-                              };
-                            }}
-                            onTouchEnd={(e) => {
-                              if (!touchStartRef.current) return;
-                              const deltaX = Math.abs(e.changedTouches[0].clientX - touchStartRef.current.x);
-                              const deltaY = Math.abs(e.changedTouches[0].clientY - touchStartRef.current.y);
-                              if (deltaX > 10 || deltaY > 10) {
-                                e.preventDefault();
-                                setOpenMenuId(null);
-                              }
-                              touchStartRef.current = null;
-                            }}
+                            {...triggerProps}
                           >
                             <MoreVertical className="w-4 h-4" />
                           </Button>
