@@ -76,7 +76,7 @@ export function CardActionMenu({
         <Button
           variant="ghost"
           size="icon"
-          className={`h-8 w-8 ${className}`}
+          className={`h-8 w-8 touch-manipulation ${className}`}
         >
           <MoreVertical className="w-4 h-4" />
           <span className="sr-only">Open menu</span>
