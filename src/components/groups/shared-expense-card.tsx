@@ -51,7 +51,7 @@ export function SharedExpenseCard({
 }: SharedExpenseCardProps) {
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const { open: menuOpen, setOpen: setMenuOpen, triggerProps } = useScrollAwareMenu();
+  const { open: menuOpen, onOpenChange: setMenuOpen, triggerProps } = useScrollAwareMenu();
 
   const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',

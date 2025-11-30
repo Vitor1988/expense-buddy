@@ -35,7 +35,7 @@ interface GroupCardProps {
 export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { open: menuOpen, setOpen: setMenuOpen, triggerProps } = useScrollAwareMenu();
+  const { open: menuOpen, onOpenChange: setMenuOpen, triggerProps } = useScrollAwareMenu();
 
   const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',

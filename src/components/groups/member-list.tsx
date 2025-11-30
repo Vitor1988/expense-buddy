@@ -30,7 +30,7 @@ interface MemberListProps {
 export function MemberList({ groupId, members, currentUserId }: MemberListProps) {
   const [pendingInvites, setPendingInvites] = useState<{ id: string; invited_email: string; created_at: string; token: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const { triggerProps } = useScrollAwareMenu();
+  const { isScrolling, triggerProps } = useScrollAwareMenu();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Check if current user is admin
@@ -191,7 +191,18 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
                     {isAdmin && !isCurrentUser && (
                       <DropdownMenu
                         open={openMenuId === member.user_id}
-                        onOpenChange={(open) => setOpenMenuId(open ? member.user_id : null)}
+                        onOpenChange={(open) => {
+                          // Always allow closing
+                          if (!open) {
+                            setOpenMenuId(null);
+                            return;
+                          }
+                          // Block opening if scrolling was detected
+                          if (isScrolling()) {
+                            return;
+                          }
+                          setOpenMenuId(member.user_id);
+                        }}
                       >
                         <DropdownMenuTrigger asChild>
                           <Button

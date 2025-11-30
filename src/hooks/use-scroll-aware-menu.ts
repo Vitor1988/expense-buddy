@@ -1,92 +1,83 @@
 import { useState, useRef, useCallback } from 'react';
 
-const DISTANCE_THRESHOLD = 10; // pixels
-const TIME_THRESHOLD = 200; // milliseconds
+const SCROLL_THRESHOLD = 10; // pixels
 
 /**
  * Hook for scroll-aware dropdown menu handling on mobile.
  * Prevents menu from opening accidentally during scroll gestures.
  *
- * Uses Pointer Events API with combined distance + time threshold
- * to distinguish between intentional taps and scroll gestures.
+ * v4 Approach: Intercepts onOpenChange and blocks opening if scroll was detected.
+ * This works because:
+ * 1. onTouchMove fires and sets isScrollingRef = true
+ * 2. Radix calls onOpenChange(true)
+ * 3. We check isScrollingRef and return without calling setOpen(true)
+ * 4. Menu never opens!
  *
  * @see https://github.com/radix-ui/primitives/issues/1912
  * @see https://github.com/radix-ui/primitives/issues/2418
  */
 export function useScrollAwareMenu() {
   const [open, setOpen] = useState(false);
-  const pointerStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
-  const wasScrollingRef = useRef(false);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const isScrollingRef = useRef(false);
 
-  const handlePointerDown = useCallback((e: React.PointerEvent) => {
-    // Only track touch events (not mouse)
-    if (e.pointerType === 'touch') {
-      pointerStartRef.current = {
-        x: e.clientX,
-        y: e.clientY,
-        time: Date.now(),
-      };
-      wasScrollingRef.current = false;
+  // Track touch start position
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    const touch = e.touches[0];
+    touchStartRef.current = { x: touch.clientX, y: touch.clientY };
+    isScrollingRef.current = false;
+  }, []);
+
+  // Detect scroll movement
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!touchStartRef.current) return;
+
+    const touch = e.touches[0];
+    const deltaX = Math.abs(touch.clientX - touchStartRef.current.x);
+    const deltaY = Math.abs(touch.clientY - touchStartRef.current.y);
+
+    if (deltaX > SCROLL_THRESHOLD || deltaY > SCROLL_THRESHOLD) {
+      isScrollingRef.current = true;
     }
   }, []);
 
-  const handlePointerMove = useCallback((e: React.PointerEvent) => {
-    if (e.pointerType !== 'touch' || !pointerStartRef.current) return;
-
-    const deltaX = Math.abs(e.clientX - pointerStartRef.current.x);
-    const deltaY = Math.abs(e.clientY - pointerStartRef.current.y);
-
-    // If moved more than threshold, it's a scroll
-    if (deltaX > DISTANCE_THRESHOLD || deltaY > DISTANCE_THRESHOLD) {
-      wasScrollingRef.current = true;
-    }
+  // Reset on touch end
+  const handleTouchEnd = useCallback(() => {
+    // Small delay to let onOpenChange fire first
+    setTimeout(() => {
+      touchStartRef.current = null;
+      isScrollingRef.current = false;
+    }, 100);
   }, []);
 
-  const handleClick = useCallback((e: React.MouseEvent) => {
-    // Block click if it was a scroll gesture
-    if (wasScrollingRef.current) {
-      e.preventDefault();
-      e.stopPropagation();
-      wasScrollingRef.current = false;
-      pointerStartRef.current = null;
+  // CRITICAL: Intercept open change and block if scrolling
+  const handleOpenChange = useCallback((newOpen: boolean) => {
+    // Always allow closing
+    if (!newOpen) {
+      setOpen(false);
       return;
     }
 
-    // Check time threshold (if took too long, probably slow scroll)
-    if (pointerStartRef.current) {
-      const elapsed = Date.now() - pointerStartRef.current.time;
-      if (elapsed > TIME_THRESHOLD) {
-        e.preventDefault();
-        e.stopPropagation();
-        pointerStartRef.current = null;
-        return;
-      }
+    // Block opening if we detected scrolling
+    if (isScrollingRef.current) {
+      return; // Don't open!
     }
 
-    pointerStartRef.current = null;
+    setOpen(true);
   }, []);
 
-  const handlePointerUp = useCallback(() => {
-    // Reset after small delay to ensure onClick has executed
-    setTimeout(() => {
-      wasScrollingRef.current = false;
-    }, 50);
-  }, []);
-
-  const handlePointerCancel = useCallback(() => {
-    pointerStartRef.current = null;
-    wasScrollingRef.current = false;
-  }, []);
+  // Check if currently scrolling (for custom open change handlers)
+  const isScrolling = useCallback(() => isScrollingRef.current, []);
 
   return {
     open,
     setOpen,
+    onOpenChange: handleOpenChange,
+    isScrolling,
     triggerProps: {
-      onPointerDown: handlePointerDown,
-      onPointerMove: handlePointerMove,
-      onPointerUp: handlePointerUp,
-      onPointerCancel: handlePointerCancel,
-      onClick: handleClick,
+      onTouchStart: handleTouchStart,
+      onTouchMove: handleTouchMove,
+      onTouchEnd: handleTouchEnd,
     },
   };
 }

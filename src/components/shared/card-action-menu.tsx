@@ -69,7 +69,7 @@ export function CardActionMenu({
   children,
   className = '',
 }: CardActionMenuProps) {
-  const { open, setOpen, triggerProps } = useScrollAwareMenu();
+  const { open, onOpenChange, triggerProps } = useScrollAwareMenu();
 
   // Don't render if no actions
   if (!onEdit && !onDelete && !children) {
@@ -77,7 +77,7 @@ export function CardActionMenu({
   }
 
   return (
-    <DropdownMenu open={open} onOpenChange={setOpen}>
+    <DropdownMenu open={open} onOpenChange={onOpenChange}>
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
