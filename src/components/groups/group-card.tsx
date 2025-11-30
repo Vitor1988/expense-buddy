@@ -110,7 +110,12 @@ export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps
               </div>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 touch-manipulation">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-10 w-10 mobile-menu-trigger touch-manipulation"
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
                     <MoreVertical className="w-4 h-4" />
                   </Button>
                 </DropdownMenuTrigger>

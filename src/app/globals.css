@@ -15,6 +15,13 @@
   .pt-safe {
     padding-top: env(safe-area-inset-top, 0);
   }
+
+  /* Mobile-optimized menu triggers - prevents scroll interference */
+  .mobile-menu-trigger {
+    touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
+  }
 }
 
 /* Smooth scrolling */

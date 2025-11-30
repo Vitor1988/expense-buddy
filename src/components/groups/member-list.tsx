@@ -188,7 +188,12 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
                     {isAdmin && !isCurrentUser && (
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-10 w-10 mobile-menu-trigger touch-manipulation"
+                            onPointerDown={(e) => e.stopPropagation()}
+                          >
                             <MoreVertical className="w-4 h-4" />
                           </Button>
                         </DropdownMenuTrigger>
