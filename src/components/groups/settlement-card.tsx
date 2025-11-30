@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { HandCoins, Trash2 } from 'lucide-react';
@@ -29,10 +29,10 @@ export function SettlementCard({
 }: SettlementCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const isMySettlement = settlement.from_user?.id === currentUserId;
   const fromName = settlement.from_user?.id === currentUserId ? 'You' : settlement.from_user?.full_name || 'Unknown';

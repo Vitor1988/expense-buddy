@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -38,10 +38,10 @@ export function BudgetsPageClient({
   const router = useRouter();
   const [showNewDialog, setShowNewDialog] = useState(false);
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const handleCreate = async (formData: FormData) => {
     // Handle "all" category value

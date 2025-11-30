@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,10 +19,10 @@ interface GroupsBalanceWidgetProps {
 }
 
 export function GroupsBalanceWidget({ groups, currency }: GroupsBalanceWidgetProps) {
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const totalOwed = groups.reduce((sum, g) => sum + (g.your_balance > 0 ? g.your_balance : 0), 0);
   const totalOwing = groups.reduce((sum, g) => sum + (g.your_balance < 0 ? Math.abs(g.your_balance) : 0), 0);

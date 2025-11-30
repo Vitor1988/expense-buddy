@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,10 +35,10 @@ export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const handleDelete = async () => {
     setIsDeleting(true);

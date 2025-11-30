@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { CardActionMenu, DeleteConfirmationDialog } from '@/components/shared';
 import { useDeleteAction } from '@/hooks/use-delete-action';
@@ -19,10 +20,10 @@ export function ExpenseCard({ expense, currency = 'USD' }: ExpenseCardProps) {
     expense.id
   );
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const category = expense.category;
 

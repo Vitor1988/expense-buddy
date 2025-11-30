@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,10 +27,10 @@ export function RecurringPageClient({
   const [showNewDialog, setShowNewDialog] = useState(false);
   const { toast } = useToast();
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const handleCreate = async (formData: FormData) => {
     const result = await createRecurringExpense(formData);

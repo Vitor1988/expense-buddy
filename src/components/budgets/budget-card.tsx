@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { AlertTriangle } from 'lucide-react';
@@ -37,10 +37,10 @@ export function BudgetCard({ budget, categories, currency = 'USD' }: BudgetCardP
     budget.id
   );
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const handleUpdate = async (formData: FormData) => {
     return updateBudget(budget.id, formData);

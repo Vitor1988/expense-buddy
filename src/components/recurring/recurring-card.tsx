@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
@@ -29,10 +29,10 @@ export function RecurringCard({ recurring, categories, currency = 'USD', onToggl
     recurring.id
   );
 
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const handleUpdate = async (formData: FormData) => {
     return updateRecurringExpense(recurring.id, formData);

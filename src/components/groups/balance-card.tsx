@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import type { GroupBalance } from '@/types';
@@ -11,10 +12,10 @@ interface BalanceCardProps {
 }
 
 export function BalanceCard({ balance, currency, isCurrentUser }: BalanceCardProps) {
-  const formatter = new Intl.NumberFormat('en-US', {
+  const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
-  });
+  }), [currency]);
 
   const initials = balance.profile?.full_name
     ?.split(' ')
