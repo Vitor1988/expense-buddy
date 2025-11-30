@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { ChevronDown, Calendar } from 'lucide-react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -21,9 +21,12 @@ export function MonthlyExpenseCard({ data, currency, defaultExpanded = false }: 
   const [isExpanded, setIsExpanded] = useState(defaultExpanded);
   const [showAllExpenses, setShowAllExpenses] = useState(false);
 
-  const displayedExpenses = showAllExpenses
-    ? data.expenses
-    : data.expenses.slice(0, INITIAL_EXPENSE_COUNT);
+  const displayedExpenses = useMemo(() =>
+    showAllExpenses
+      ? data.expenses
+      : data.expenses.slice(0, INITIAL_EXPENSE_COUNT),
+    [showAllExpenses, data.expenses]
+  );
 
   const remainingExpenses = data.expenses.length - INITIAL_EXPENSE_COUNT;
   const hasMoreExpenses = remainingExpenses > 0;

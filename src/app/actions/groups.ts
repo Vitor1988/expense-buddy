@@ -670,7 +670,8 @@ async function calculateUserBalancesForGroups(
   return balances;
 }
 
-async function calculateUserBalanceInGroup(groupId: string, userId: string): Promise<number> {
+// Kept for potential single-user balance calculations (currently unused after batch optimization)
+async function _calculateUserBalanceInGroup(groupId: string, userId: string): Promise<number> {
   const supabase = await createClient();
 
   // Get all expenses user paid for
@@ -739,51 +740,82 @@ export async function getGroupBalances(groupId: string): Promise<{
     return { data: null, error: 'You are not a member of this group' };
   }
 
-  // Get all members
-  const { data: members, error: membersError } = await supabase
-    .from('group_members')
-    .select('user_id, profile:profiles(id, full_name, avatar_url)')
-    .eq('group_id', groupId);
+  // Batch fetch all data in parallel (4 queries instead of N*6)
+  const [
+    { data: members, error: membersError },
+    { data: allPaidExpenses },
+    { data: allSplits },
+    { data: allSettlements },
+  ] = await Promise.all([
+    // Get all members with profiles
+    supabase
+      .from('group_members')
+      .select('user_id, profile:profiles(id, full_name, avatar_url)')
+      .eq('group_id', groupId),
+    // Get all expenses paid by anyone in this group
+    supabase
+      .from('shared_expenses')
+      .select('amount, paid_by')
+      .eq('group_id', groupId),
+    // Get all splits in this group
+    supabase
+      .from('expense_splits')
+      .select('amount, user_id, shared_expenses!inner(group_id)')
+      .eq('shared_expenses.group_id', groupId),
+    // Get all settlements in this group
+    supabase
+      .from('settlements')
+      .select('amount, from_user_id, to_user_id')
+      .eq('group_id', groupId),
+  ]);
 
   if (membersError) {
     return { data: null, error: membersError.message };
   }
 
-  // Calculate balance for each member
-  const balances: GroupBalance[] = await Promise.all(
-    (members || []).map(async (member) => {
-      const balance = await calculateUserBalanceInGroup(groupId, member.user_id);
+  // Pre-calculate totals per user for O(1) lookups
+  const paidByUser: Record<string, number> = {};
+  const owedByUser: Record<string, number> = {};
+  const settledPaidByUser: Record<string, number> = {};
+  const settledReceivedByUser: Record<string, number> = {};
 
-      // Get total paid by this member
-      const { data: paidExpenses } = await supabase
-        .from('shared_expenses')
-        .select('amount')
-        .eq('group_id', groupId)
-        .eq('paid_by', member.user_id);
+  // Sum paid expenses per user
+  (allPaidExpenses || []).forEach((e) => {
+    paidByUser[e.paid_by] = (paidByUser[e.paid_by] || 0) + Number(e.amount);
+  });
 
-      const totalPaid = (paidExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
+  // Sum splits (what each user owes)
+  (allSplits || []).forEach((s) => {
+    owedByUser[s.user_id] = (owedByUser[s.user_id] || 0) + Number(s.amount);
+  });
 
-      // Get total this member owes
-      const { data: splits } = await supabase
-        .from('expense_splits')
-        .select('amount, shared_expenses!inner(group_id)')
-        .eq('user_id', member.user_id)
-        .eq('shared_expenses.group_id', groupId);
+  // Sum settlements
+  (allSettlements || []).forEach((s) => {
+    settledPaidByUser[s.from_user_id] = (settledPaidByUser[s.from_user_id] || 0) + Number(s.amount);
+    settledReceivedByUser[s.to_user_id] = (settledReceivedByUser[s.to_user_id] || 0) + Number(s.amount);
+  });
 
-      const totalOwed = (splits || []).reduce((sum, s) => sum + Number(s.amount), 0);
+  // Calculate balances for all members using pre-computed data
+  const balances: GroupBalance[] = (members || []).map((member) => {
+    const totalPaid = paidByUser[member.user_id] || 0;
+    const totalOwed = owedByUser[member.user_id] || 0;
+    const totalSettledPaid = settledPaidByUser[member.user_id] || 0;
+    const totalSettledReceived = settledReceivedByUser[member.user_id] || 0;
 
-      // Handle Supabase's join result type
-      const profileData = member.profile as unknown as { id: string; full_name: string | null; avatar_url: string | null } | null;
+    // Net balance: positive = others owe you, negative = you owe others
+    const netBalance = totalPaid - totalOwed + totalSettledPaid - totalSettledReceived;
 
-      return {
-        user_id: member.user_id,
-        profile: profileData || undefined,
-        total_paid: totalPaid,
-        total_owed: totalOwed,
-        net_balance: balance,
-      };
-    })
-  );
+    // Handle Supabase's join result type
+    const profileData = member.profile as unknown as { id: string; full_name: string | null; avatar_url: string | null } | null;
+
+    return {
+      user_id: member.user_id,
+      profile: profileData || undefined,
+      total_paid: totalPaid,
+      total_owed: totalOwed,
+      net_balance: netBalance,
+    };
+  });
 
   return { data: balances, error: null };
 }

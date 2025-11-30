@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef } from 'react';
+import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { createClient } from '@/lib/supabase/client';
@@ -111,11 +112,14 @@ export function ReceiptUpload({ currentUrl, onUpload, expenseId: _expenseId }: R
       />
 
       {preview ? (
-        <div className="relative">
-          <img
+        <div className="relative w-full h-48">
+          <Image
             src={preview}
             alt="Receipt"
-            className="w-full max-h-48 object-contain rounded-lg border"
+            fill
+            className="object-contain rounded-lg border"
+            sizes="(max-width: 768px) 100vw, 50vw"
+            unoptimized={preview.includes('supabase')}
           />
           <Button
             type="button"

@@ -180,9 +180,39 @@ npm run lint     # Run ESLint
 - [x] Toast notifications for all actions
 - [x] Skeleton loaders
 - [x] Server components for faster page loads (budgets, categories, recurring, settings)
+- [x] Loading states for categories, recurring, settings pages
+- [x] Performance optimizations (useMemo/useCallback, batch queries, lazy loading)
+- [x] ErrorBoundary component for graceful error handling
 - [ ] Edge case handling
 - [ ] Dashboard groups balance widget
 - [ ] Mobile UX improvements
+
+## Performance Optimizations (Round 2)
+
+### Database Query Optimization
+- Fixed N+1 query in `getGroupBalances()` - reduced from N*6 queries to 4 queries
+- Uses batch query pattern with parallel `Promise.all()` for data fetching
+- Pre-calculates totals per user for O(1) lookups
+
+### React Performance
+- Added `useMemo` for expensive calculations:
+  - `groups-page-client.tsx`: totalOwed/totalOwing calculations
+  - `shared-expense-card.tsx`: Intl.NumberFormat instance
+  - `monthly-expense-card.tsx`: displayedExpenses array
+- Added `useCallback` for stable function references:
+  - `monthly-expense-section.tsx`: handleLoadMore callback
+
+### Image Optimization
+- Replaced `<img>` with Next.js `<Image>` in receipt-upload component
+- Uses `fill` mode with responsive `sizes` attribute
+
+### Bundle Optimization
+- Charts (Recharts) are lazy loaded with `dynamic()` on reports page
+- Loading skeletons shown while charts load
+
+### Shared Components
+- `ErrorBoundary` component added for graceful error handling
+- Exported from `@/components/shared`
 
 ## Supabase Configuration Required
 

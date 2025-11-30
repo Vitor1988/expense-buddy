@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,13 +46,15 @@ export function GroupsPageClient({ groups, currency }: GroupsPageClientProps) {
     router.refresh();
   };
 
-  // Calculate totals
-  const totalOwed = groups.reduce((sum, g) => sum + Math.max(0, g.your_balance), 0);
-  const totalOwing = groups.reduce((sum, g) => sum + Math.max(0, -g.your_balance), 0);
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  });
+  // Calculate totals - memoized for performance
+  const { totalOwed, totalOwing, formatter } = useMemo(() => ({
+    totalOwed: groups.reduce((sum, g) => sum + Math.max(0, g.your_balance), 0),
+    totalOwing: groups.reduce((sum, g) => sum + Math.max(0, -g.your_balance), 0),
+    formatter: new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency,
+    }),
+  }), [groups, currency]);
 
   return (
     <div className="space-y-6">

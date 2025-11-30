@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useCallback } from 'react';
 import Link from 'next/link';
 import { History, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -18,7 +18,7 @@ export function MonthlyExpenseSection({ initialData, currency }: MonthlyExpenseS
   const [isPending, startTransition] = useTransition();
   const [hasMore, setHasMore] = useState(true);
 
-  const handleLoadMore = () => {
+  const handleLoadMore = useCallback(() => {
     startTransition(async () => {
       const { data, error } = await loadMoreMonths(months.length, 3);
 
@@ -35,7 +35,7 @@ export function MonthlyExpenseSection({ initialData, currency }: MonthlyExpenseS
         setHasMore(false);
       }
     });
-  };
+  }, [months.length]);
 
   return (
     <div className="space-y-4">
