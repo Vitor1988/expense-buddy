@@ -69,6 +69,7 @@ src/
 │   ├── utils.ts           # Utility functions
 │   └── validations.ts     # Zod schemas for validation
 ├── hooks/                 # Custom React hooks
+│   └── use-formatter.ts   # Memoized currency formatter hook
 └── types/                 # TypeScript type definitions
 ```
 
@@ -183,36 +184,21 @@ npm run lint     # Run ESLint
 - [x] Loading states for categories, recurring, settings pages
 - [x] Performance optimizations (useMemo/useCallback, batch queries, lazy loading)
 - [x] ErrorBoundary component for graceful error handling
+- [x] Pagination for expenses page (20 items per page)
 - [ ] Edge case handling
 - [ ] Dashboard groups balance widget
 - [ ] Mobile UX improvements
 
-## Performance Optimizations (Round 2)
+## Performance Patterns
 
-### Database Query Optimization
-- Fixed N+1 query in `getGroupBalances()` - reduced from N*6 queries to 4 queries
-- Uses batch query pattern with parallel `Promise.all()` for data fetching
-- Pre-calculates totals per user for O(1) lookups
-
-### React Performance
-- Added `useMemo` for expensive calculations:
-  - `groups-page-client.tsx`: totalOwed/totalOwing calculations
-  - `shared-expense-card.tsx`: Intl.NumberFormat instance
-  - `monthly-expense-card.tsx`: displayedExpenses array
-- Added `useCallback` for stable function references:
-  - `monthly-expense-section.tsx`: handleLoadMore callback
-
-### Image Optimization
-- Replaced `<img>` with Next.js `<Image>` in receipt-upload component
-- Uses `fill` mode with responsive `sizes` attribute
-
-### Bundle Optimization
-- Charts (Recharts) are lazy loaded with `dynamic()` on reports page
-- Loading skeletons shown while charts load
-
-### Shared Components
-- `ErrorBoundary` component added for graceful error handling
-- Exported from `@/components/shared`
+- Use `useMemo` for expensive calculations and `Intl.NumberFormat` instances
+- Use `useCallback` for functions passed as props
+- Use `useRef` for debounce timeouts (not state)
+- Use `useFormatter` hook from `@/hooks/use-formatter.ts` for currency formatting
+- Wrap lazy-loaded components with `ErrorBoundary` from `@/components/shared`
+- Use `Promise.all()` for parallel database queries
+- Use Next.js `<Image>` instead of `<img>` for images
+- Expenses page uses server-side pagination (20 items/page) via `getExpensesPaginated()`
 
 ## Supabase Configuration Required
 
