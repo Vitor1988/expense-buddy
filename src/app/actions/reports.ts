@@ -98,27 +98,47 @@ export async function getMonthlyComparison(months: number = 6) {
   }
 
   const now = new Date();
-  const data = [];
 
+  // Calculate date range for single query
+  const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
+  const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  // Fetch all expenses in the date range with a single query
+  const { data: expenses } = await supabase
+    .from('expenses')
+    .select('amount, date')
+    .eq('user_id', user.id)
+    .gte('date', startDate.toISOString().split('T')[0])
+    .lte('date', endDate.toISOString().split('T')[0]);
+
+  // Group expenses by month in JavaScript
+  const monthlyTotals: Record<string, number> = {};
+
+  // Initialize all months with 0
   for (let i = months - 1; i >= 0; i--) {
     const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const start = new Date(date.getFullYear(), date.getMonth(), 1);
-    const end = new Date(date.getFullYear(), date.getMonth() + 1, 0);
-
-    const { data: expenses } = await supabase
-      .from('expenses')
-      .select('amount')
-      .eq('user_id', user.id)
-      .gte('date', start.toISOString().split('T')[0])
-      .lte('date', end.toISOString().split('T')[0]);
-
-    const total = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-
-    data.push({
-      month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
-      amount: total,
-    });
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    monthlyTotals[key] = 0;
   }
+
+  // Sum expenses by month
+  (expenses || []).forEach((expense) => {
+    const expenseDate = new Date(expense.date);
+    const key = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}`;
+    if (monthlyTotals[key] !== undefined) {
+      monthlyTotals[key] += Number(expense.amount);
+    }
+  });
+
+  // Convert to array format
+  const data = Object.entries(monthlyTotals).map(([key, amount]) => {
+    const [year, month] = key.split('-');
+    const date = new Date(parseInt(year), parseInt(month) - 1, 1);
+    return {
+      month: date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      amount,
+    };
+  });
 
   return { data, error: null };
 }

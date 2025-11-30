@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
@@ -16,12 +17,15 @@ interface SpendingPieChartProps {
 }
 
 export function SpendingPieChart({ data, currency = 'USD' }: SpendingPieChartProps) {
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  });
+  const formatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency }),
+    [currency]
+  );
 
-  const total = data.reduce((sum, item) => sum + item.value, 0);
+  const total = useMemo(
+    () => data.reduce((sum, item) => sum + item.value, 0),
+    [data]
+  );
 
   if (data.length === 0) {
     return (

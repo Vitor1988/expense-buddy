@@ -18,44 +18,34 @@ import type { CurrencyCode } from '@/types';
 export default async function DashboardPage() {
   const supabase = await createClient();
 
-  // Get user profile for currency
+  // Get user first (required for subsequent queries)
   const {
     data: { user },
   } = await supabase.auth.getUser();
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('currency')
-    .eq('id', user?.id)
-    .single();
-
-  // Get this month's expenses for stat cards
+  // Calculate start of month once
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
+  const startOfMonthStr = startOfMonth.toISOString().split('T')[0];
 
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('amount')
-    .eq('user_id', user?.id)
-    .gte('date', startOfMonth.toISOString().split('T')[0]);
+  // Run all data fetches in parallel
+  const [
+    { data: profile },
+    { data: expenses },
+    { data: budgets },
+    { data: monthlyData },
+    { data: groups },
+  ] = await Promise.all([
+    supabase.from('profiles').select('currency').eq('id', user?.id).single(),
+    supabase.from('expenses').select('amount').eq('user_id', user?.id).gte('date', startOfMonthStr),
+    supabase.from('budgets').select('amount').eq('user_id', user?.id).eq('period', 'monthly'),
+    getExpensesByMonth(3),
+    getGroups(),
+  ]);
 
   const totalSpent = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
-
-  // Get budgets
-  const { data: budgets } = await supabase
-    .from('budgets')
-    .select('amount')
-    .eq('user_id', user?.id)
-    .eq('period', 'monthly');
-
   const totalBudget = budgets?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
-
-  // Get monthly expense data for the collapsible section
-  const { data: monthlyData } = await getExpensesByMonth(3);
-
-  // Get groups with balances
-  const { data: groups } = await getGroups();
 
   const currency = (profile?.currency || 'USD') as CurrencyCode;
   const formatter = new Intl.NumberFormat('en-US', {

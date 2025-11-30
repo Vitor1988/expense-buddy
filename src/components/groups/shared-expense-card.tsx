@@ -46,7 +46,7 @@ export function SharedExpenseCard({
   currentUserId,
   onDeleted,
   simplifiedDebts = [],
-  members = [],
+  members: _members = [],
 }: SharedExpenseCardProps) {
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);

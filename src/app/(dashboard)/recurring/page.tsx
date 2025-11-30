@@ -1,240 +1,47 @@
-'use client';
-
-import { useState, useEffect, useCallback } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Plus, RefreshCw, Loader2, Play } from 'lucide-react';
-import { RecurringCard } from '@/components/recurring/recurring-card';
-import { RecurringForm } from '@/components/recurring/recurring-form';
-import { createRecurringExpense, getRecurringExpenses, processRecurringExpenses } from '@/app/actions/recurring';
+import { RecurringPageClient } from '@/components/recurring/recurring-page-client';
+import { getRecurringExpenses } from '@/app/actions/recurring';
 import { getCategories, createDefaultCategories } from '@/app/actions/categories';
-import { createClient } from '@/lib/supabase/client';
+import { createClient } from '@/lib/supabase/server';
 import { type Category, type RecurringExpense } from '@/types';
-import { useToast } from '@/hooks/use-toast';
 
-export default function RecurringPage() {
-  const [recurring, setRecurring] = useState<(RecurringExpense & { category?: Category | null })[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
-  const [showNewDialog, setShowNewDialog] = useState(false);
-  const [currency, setCurrency] = useState('USD');
-  const { toast } = useToast();
+export default async function RecurringPage() {
+  // Fetch all data on the server in parallel
+  const [supabase, categoriesResult, recurringResult] = await Promise.all([
+    createClient(),
+    getCategories(),
+    getRecurringExpenses(),
+  ]);
 
-  const loadData = useCallback(async () => {
-    setLoading(true);
-
-    // Get user's currency
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('currency')
-        .eq('id', user.id)
-        .single();
-      if (profile?.currency) {
-        setCurrency(profile.currency);
-      }
+  // Get user's currency
+  let currency = 'USD';
+  const { data: { user } } = await supabase.auth.getUser();
+  if (user) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('currency')
+      .eq('id', user.id)
+      .single();
+    if (profile?.currency) {
+      currency = profile.currency;
     }
-
-    // Get categories
-    const { data: cats } = await getCategories();
-    if (!cats || cats.length === 0) {
-      await createDefaultCategories();
-      const result = await getCategories();
-      setCategories(result.data || []);
-    } else {
-      setCategories(cats);
-    }
-
-    // Get recurring expenses
-    const { data: recurringData } = await getRecurringExpenses();
-    if (recurringData) {
-      setRecurring(recurringData as (RecurringExpense & { category?: Category | null })[]);
-    }
-
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    loadData();
-  }, [loadData]);
-
-  const handleCreate = async (formData: FormData) => {
-    const result = await createRecurringExpense(formData);
-    if (result.success) {
-      loadData();
-    }
-    return result;
-  };
-
-  const handleProcess = async () => {
-    setProcessing(true);
-    const result = await processRecurringExpenses();
-    if (result.success) {
-      toast({
-        title: 'Recurring Expenses Processed',
-        description: `${result.processed} expense(s) were created.`,
-      });
-      loadData();
-    } else if (result.error) {
-      toast({
-        title: 'Error',
-        description: result.error,
-        variant: 'destructive',
-      });
-    }
-    setProcessing(false);
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-emerald-500" />
-      </div>
-    );
   }
 
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  });
+  // Handle categories
+  let categories = categoriesResult.data || [];
+  if (categories.length === 0) {
+    await createDefaultCategories();
+    const result = await getCategories();
+    categories = result.data || [];
+  }
 
-  // Calculate monthly total for active recurring
-  const monthlyTotal = recurring
-    .filter(r => r.is_active)
-    .reduce((sum, r) => {
-      switch (r.frequency) {
-        case 'daily':
-          return sum + r.amount * 30;
-        case 'weekly':
-          return sum + r.amount * 4;
-        case 'monthly':
-          return sum + r.amount;
-        case 'yearly':
-          return sum + r.amount / 12;
-        default:
-          return sum;
-      }
-    }, 0);
-
-  const activeCount = recurring.filter(r => r.is_active).length;
+  // Get recurring expenses
+  const recurring = (recurringResult.data || []) as (RecurringExpense & { category?: Category | null })[];
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Recurring Expenses</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Automate your regular expenses
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={handleProcess}
-            disabled={processing || activeCount === 0}
-          >
-            {processing ? (
-              <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Play className="w-4 h-4 mr-2" />
-                Process Due
-              </>
-            )}
-          </Button>
-          <Button
-            className="bg-emerald-500 hover:bg-emerald-600"
-            onClick={() => setShowNewDialog(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add Recurring
-          </Button>
-        </div>
-      </div>
-
-      {/* Summary Card */}
-      {recurring.length > 0 && (
-        <Card>
-          <CardContent className="pt-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Active Recurring
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {activeCount}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Est. Monthly Cost
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatter.format(monthlyTotal)}
-                </p>
-              </div>
-              <div>
-                <p className="text-sm font-medium text-gray-500 dark:text-gray-400">
-                  Est. Yearly Cost
-                </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                  {formatter.format(monthlyTotal * 12)}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Recurring Cards */}
-      {recurring.length > 0 ? (
-        <div className="space-y-3">
-          {recurring.map((item) => (
-            <RecurringCard
-              key={item.id}
-              recurring={item}
-              categories={categories}
-              currency={currency}
-              onToggle={loadData}
-            />
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-center">No recurring expenses</CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <RefreshCw className="w-12 h-12 mx-auto mb-4 text-gray-400" />
-            <p className="text-gray-500 dark:text-gray-400 mb-4">
-              Set up recurring expenses for subscriptions, bills, and regular payments
-            </p>
-            <Button
-              className="bg-emerald-500 hover:bg-emerald-600"
-              onClick={() => setShowNewDialog(true)}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Recurring Expense
-            </Button>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* New Recurring Dialog */}
-      <RecurringForm
-        categories={categories}
-        action={handleCreate}
-        open={showNewDialog}
-        onOpenChange={setShowNewDialog}
-        currency={currency}
-      />
-    </div>
+    <RecurringPageClient
+      recurring={recurring}
+      categories={categories}
+      currency={currency}
+    />
   );
 }

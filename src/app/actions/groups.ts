@@ -183,17 +183,14 @@ export async function getGroups(): Promise<{
     return { data: null, error: groupsError.message };
   }
 
-  // Calculate balance for each group
-  const groupsWithBalance = await Promise.all(
-    (groups || []).map(async (group) => {
-      const balance = await calculateUserBalanceInGroup(group.id, user.id);
-      return {
-        ...group,
-        member_count: (group.members as unknown as { count: number }[])?.[0]?.count || 0,
-        your_balance: balance,
-      };
-    })
-  );
+  // Calculate balances for all groups in batch (3 queries instead of 4N)
+  const balances = await calculateUserBalancesForGroups(supabase, groupIds, user.id);
+
+  const groupsWithBalance = (groups || []).map((group) => ({
+    ...group,
+    member_count: (group.members as unknown as { count: number }[])?.[0]?.count || 0,
+    your_balance: balances[group.id] || 0,
+  }));
 
   return { data: groupsWithBalance, error: null };
 }
@@ -606,6 +603,71 @@ export async function deleteSharedExpense(expenseId: string) {
 }
 
 // ============ BALANCES ============
+
+/**
+ * Calculate user balances for multiple groups in batch (3 queries instead of 4N)
+ */
+async function calculateUserBalancesForGroups(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  groupIds: string[],
+  userId: string
+): Promise<Record<string, number>> {
+  if (groupIds.length === 0) return {};
+
+  // Fetch all data in parallel with 3 queries
+  const [
+    { data: paidExpenses },
+    { data: splits },
+    { data: settlements },
+  ] = await Promise.all([
+    // All expenses user paid for in any of these groups
+    supabase
+      .from('shared_expenses')
+      .select('amount, group_id')
+      .in('group_id', groupIds)
+      .eq('paid_by', userId),
+    // All splits where user owes money in any of these groups
+    supabase
+      .from('expense_splits')
+      .select('amount, shared_expenses!inner(group_id)')
+      .eq('user_id', userId)
+      .in('shared_expenses.group_id', groupIds),
+    // All settlements in any of these groups (both directions)
+    supabase
+      .from('settlements')
+      .select('amount, group_id, from_user_id, to_user_id')
+      .in('group_id', groupIds)
+      .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`),
+  ]);
+
+  // Initialize balances for all groups
+  const balances: Record<string, number> = {};
+  groupIds.forEach((id) => (balances[id] = 0));
+
+  // Sum paid expenses per group
+  (paidExpenses || []).forEach((e) => {
+    balances[e.group_id] = (balances[e.group_id] || 0) + Number(e.amount);
+  });
+
+  // Subtract splits (what user owes) per group
+  (splits || []).forEach((s) => {
+    const groupId = (s.shared_expenses as unknown as { group_id: string }).group_id;
+    balances[groupId] = (balances[groupId] || 0) - Number(s.amount);
+  });
+
+  // Process settlements
+  (settlements || []).forEach((s) => {
+    if (s.from_user_id === userId) {
+      // User paid this settlement (reduces what they owe)
+      balances[s.group_id] = (balances[s.group_id] || 0) + Number(s.amount);
+    } else if (s.to_user_id === userId) {
+      // User received this settlement (reduces what they're owed)
+      balances[s.group_id] = (balances[s.group_id] || 0) - Number(s.amount);
+    }
+  });
+
+  return balances;
+}
 
 async function calculateUserBalanceInGroup(groupId: string, userId: string): Promise<number> {
   const supabase = await createClient();

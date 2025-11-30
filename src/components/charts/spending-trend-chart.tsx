@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   AreaChart,
   Area,
@@ -22,10 +23,10 @@ interface SpendingTrendChartProps {
 }
 
 export function SpendingTrendChart({ data, currency = 'USD' }: SpendingTrendChartProps) {
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  });
+  const formatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency }),
+    [currency]
+  );
 
   if (data.length === 0) {
     return (

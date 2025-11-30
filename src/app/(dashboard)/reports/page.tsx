@@ -1,14 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import dynamic from 'next/dynamic';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Download, TrendingUp, TrendingDown, Calendar } from 'lucide-react';
-import { SpendingPieChart } from '@/components/charts/spending-pie-chart';
-import { SpendingTrendChart } from '@/components/charts/spending-trend-chart';
-import { MonthlyComparisonChart } from '@/components/charts/monthly-comparison-chart';
 import {
   getSpendingByCategory,
   getSpendingTrend,
@@ -19,6 +17,38 @@ import {
 import { createClient } from '@/lib/supabase/client';
 import { formatCurrency, formatDate } from '@/lib/utils';
 import { type CurrencyCode } from '@/types';
+
+// Chart skeleton component for loading state
+function ChartSkeleton() {
+  return (
+    <Card>
+      <CardHeader>
+        <div className="h-6 w-48 bg-gray-200 dark:bg-gray-700 rounded animate-pulse" />
+      </CardHeader>
+      <CardContent>
+        <div className="h-64 bg-gray-100 dark:bg-gray-800 rounded animate-pulse flex items-center justify-center">
+          <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Lazy load chart components to reduce initial bundle size
+const SpendingPieChart = dynamic(
+  () => import('@/components/charts/spending-pie-chart').then(mod => ({ default: mod.SpendingPieChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const SpendingTrendChart = dynamic(
+  () => import('@/components/charts/spending-trend-chart').then(mod => ({ default: mod.SpendingTrendChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
+
+const MonthlyComparisonChart = dynamic(
+  () => import('@/components/charts/monthly-comparison-chart').then(mod => ({ default: mod.MonthlyComparisonChart })),
+  { loading: () => <ChartSkeleton />, ssr: false }
+);
 
 interface SpendingData {
   name: string;

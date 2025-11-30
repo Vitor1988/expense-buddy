@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   BarChart,
   Bar,
@@ -22,10 +23,15 @@ interface MonthlyComparisonChartProps {
 }
 
 export function MonthlyComparisonChart({ data, currency = 'USD' }: MonthlyComparisonChartProps) {
-  const formatter = new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency,
-  });
+  const formatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency }),
+    [currency]
+  );
+
+  const avgSpending = useMemo(
+    () => (data.length > 0 ? data.reduce((sum, d) => sum + d.amount, 0) / data.length : 0),
+    [data]
+  );
 
   if (data.length === 0) {
     return (
@@ -39,8 +45,6 @@ export function MonthlyComparisonChart({ data, currency = 'USD' }: MonthlyCompar
       </Card>
     );
   }
-
-  const avgSpending = data.reduce((sum, d) => sum + d.amount, 0) / data.length;
 
   return (
     <Card>
