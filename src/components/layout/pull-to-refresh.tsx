@@ -54,7 +54,7 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
       <div
         className="fixed left-0 right-0 flex justify-center pointer-events-none z-50 transition-all duration-200"
         style={{
-          top: -40 + (refreshing ? 60 : pullDistance),
+          top: -40 + (refreshing ? 50 : pullDistance),
           opacity: pullDistance > 10 || refreshing ? 1 : 0
         }}
       >
