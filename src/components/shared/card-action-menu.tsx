@@ -1,50 +1,20 @@
 'use client';
 
 /**
- * Reusable dropdown menu for card actions (Edit, Delete, etc.).
- * Use this component in card components that need action buttons.
+ * Reusable action menu for cards (Edit, Delete, etc.).
+ * Uses Popover with PopoverAnchor + onClick to avoid mobile scroll issues.
  *
- * Includes scroll-aware touch handling to prevent accidental menu opens
- * during scroll gestures on mobile devices.
+ * DropdownMenu uses onPointerDown which fires during scroll gestures.
+ * This approach uses onClick which only fires after the gesture completes,
+ * behaving like native date pickers and other form elements.
  *
  * @module components/shared/card-action-menu
- * @see MODULES.md for full documentation
- *
- * @example
- * // Basic usage with edit and delete
- * <CardActionMenu
- *   onEdit={() => setShowEditDialog(true)}
- *   onDelete={() => setShowDeleteDialog(true)}
- * />
- *
- * @example
- * // With custom labels
- * <CardActionMenu
- *   onEdit={handleEdit}
- *   onDelete={handleDelete}
- *   editLabel="Modify"
- *   deleteLabel="Remove"
- * />
- *
- * @example
- * // With additional custom menu items
- * <CardActionMenu onDelete={handleDelete}>
- *   <DropdownMenuItem onClick={handleDuplicate}>
- *     <Copy className="w-4 h-4 mr-2" />
- *     Duplicate
- *   </DropdownMenuItem>
- * </CardActionMenu>
  */
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { MoreVertical, Pencil, Trash2 } from 'lucide-react';
-import { useScrollAwareMenu } from '@/hooks/use-scroll-aware-menu';
 
 export interface CardActionMenuProps {
   /** Handler for edit action (if omitted, edit item is not shown) */
@@ -69,44 +39,58 @@ export function CardActionMenu({
   children,
   className = '',
 }: CardActionMenuProps) {
-  const { open, onOpenChange, triggerProps } = useScrollAwareMenu();
+  const [open, setOpen] = useState(false);
 
   // Don't render if no actions
   if (!onEdit && !onDelete && !children) {
     return null;
   }
 
+  const handleAction = (action: () => void) => {
+    setOpen(false);
+    action();
+  };
+
   return (
-    <DropdownMenu open={open} onOpenChange={onOpenChange}>
-      <DropdownMenuTrigger asChild>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverAnchor asChild>
         <Button
           variant="ghost"
           size="icon"
           className={`h-8 w-8 ${className}`}
-          {...triggerProps}
+          onClick={() => setOpen(true)}
         >
           <MoreVertical className="w-4 h-4" />
           <span className="sr-only">Open menu</span>
         </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {onEdit && (
-          <DropdownMenuItem onClick={onEdit}>
-            <Pencil className="w-4 h-4 mr-2" />
-            {editLabel}
-          </DropdownMenuItem>
-        )}
-        {children}
-        {onDelete && (
-          <DropdownMenuItem
-            onClick={onDelete}
-            className="text-red-600 focus:text-red-600 dark:text-red-400 dark:focus:text-red-400"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            {deleteLabel}
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+      </PopoverAnchor>
+      <PopoverContent
+        align="end"
+        className="w-40 p-1"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+      >
+        <div className="flex flex-col">
+          {onEdit && (
+            <button
+              onClick={() => handleAction(onEdit)}
+              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+            >
+              <Pencil className="w-4 h-4" />
+              {editLabel}
+            </button>
+          )}
+          {children}
+          {onDelete && (
+            <button
+              onClick={() => handleAction(onDelete)}
+              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent text-red-600 dark:text-red-400 transition-colors text-left"
+            >
+              <Trash2 className="w-4 h-4" />
+              {deleteLabel}
+            </button>
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }

@@ -1,16 +1,10 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useScrollAwareMenu } from '@/hooks/use-scroll-aware-menu';
 import Link from 'next/link';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import {
   Dialog,
   DialogContent,
@@ -35,7 +29,7 @@ interface GroupCardProps {
 export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const { open: menuOpen, onOpenChange: setMenuOpen, triggerProps } = useScrollAwareMenu();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -110,31 +104,46 @@ export function GroupCard({ group, currency, onEdit, onDeleted }: GroupCardProps
                   {balanceText}
                 </p>
               </div>
-              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-                <DropdownMenuTrigger asChild>
+              <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+                <PopoverAnchor asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    {...triggerProps}
+                    onClick={() => setMenuOpen(true)}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={onEdit}>
-                    <Pencil className="w-4 h-4 mr-2" />
-                    Edit
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-600 dark:text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </PopoverAnchor>
+                <PopoverContent
+                  align="end"
+                  className="w-40 p-1"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  <div className="flex flex-col">
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        onEdit();
+                      }}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors text-left"
+                    >
+                      <Pencil className="w-4 h-4" />
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setShowDeleteDialog(true);
+                      }}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent text-red-600 dark:text-red-400 transition-colors text-left"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
         </CardContent>

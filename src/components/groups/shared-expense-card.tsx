@@ -1,17 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useScrollAwareMenu } from '@/hooks/use-scroll-aware-menu';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { MoreVertical, Trash2, Receipt, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import { deleteSharedExpense } from '@/app/actions/groups';
@@ -51,7 +45,7 @@ export function SharedExpenseCard({
 }: SharedExpenseCardProps) {
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const { open: menuOpen, onOpenChange: setMenuOpen, triggerProps } = useScrollAwareMenu();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const formatter = useMemo(() => new Intl.NumberFormat('en-US', {
     style: 'currency',
@@ -146,27 +140,36 @@ export function SharedExpenseCard({
                   </p>
                 )}
               </div>
-              <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-                <DropdownMenuTrigger asChild>
+              <Popover open={menuOpen} onOpenChange={setMenuOpen}>
+                <PopoverAnchor asChild>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-8 w-8"
-                    {...triggerProps}
+                    onClick={() => setMenuOpen(true)}
                   >
                     <MoreVertical className="w-4 h-4" />
                   </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onClick={() => setShowDeleteDialog(true)}
-                    className="text-red-600 dark:text-red-400"
-                  >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+                </PopoverAnchor>
+                <PopoverContent
+                  align="end"
+                  className="w-40 p-1"
+                  onOpenAutoFocus={(e) => e.preventDefault()}
+                >
+                  <div className="flex flex-col">
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        setShowDeleteDialog(true);
+                      }}
+                      className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent text-red-600 dark:text-red-400 transition-colors text-left"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                      Delete
+                    </button>
+                  </div>
+                </PopoverContent>
+              </Popover>
             </div>
           </div>
 

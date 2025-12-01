@@ -1,18 +1,11 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { useScrollAwareMenu } from '@/hooks/use-scroll-aware-menu';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
 import { Crown, MoreVertical, UserMinus, Shield, ShieldOff, Clock, X, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { MemberInviteForm } from './member-invite-form';
@@ -30,7 +23,6 @@ interface MemberListProps {
 export function MemberList({ groupId, members, currentUserId }: MemberListProps) {
   const [pendingInvites, setPendingInvites] = useState<{ id: string; invited_email: string; created_at: string; token: string }[]>([]);
   const [loading, setLoading] = useState(false);
-  const { isScrolling, triggerProps } = useScrollAwareMenu();
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
 
   // Check if current user is admin
@@ -189,59 +181,60 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
                       </Badge>
                     )}
                     {isAdmin && !isCurrentUser && (
-                      <DropdownMenu
+                      <Popover
                         open={openMenuId === member.user_id}
-                        onOpenChange={(open) => {
-                          // Always allow closing
-                          if (!open) {
-                            setOpenMenuId(null);
-                            return;
-                          }
-                          // Block opening if scrolling was detected
-                          if (isScrolling()) {
-                            return;
-                          }
-                          setOpenMenuId(member.user_id);
-                        }}
+                        onOpenChange={(open) => setOpenMenuId(open ? member.user_id : null)}
                       >
-                        <DropdownMenuTrigger asChild>
+                        <PopoverAnchor asChild>
                           <Button
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8"
-                            {...triggerProps}
+                            onClick={() => setOpenMenuId(member.user_id)}
                           >
                             <MoreVertical className="w-4 h-4" />
                           </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={() => handleToggleRole(member.user_id, member.role)}
-                            disabled={loading}
-                          >
-                            {member.role === 'admin' ? (
-                              <>
-                                <ShieldOff className="w-4 h-4 mr-2" />
-                                Remove Admin
-                              </>
-                            ) : (
-                              <>
-                                <Shield className="w-4 h-4 mr-2" />
-                                Make Admin
-                              </>
-                            )}
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onClick={() => handleRemoveMember(member.user_id)}
-                            disabled={loading}
-                            className="text-red-600 focus:text-red-600"
-                          >
-                            <UserMinus className="w-4 h-4 mr-2" />
-                            Remove from Group
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                        </PopoverAnchor>
+                        <PopoverContent
+                          align="end"
+                          className="w-44 p-1"
+                          onOpenAutoFocus={(e) => e.preventDefault()}
+                        >
+                          <div className="flex flex-col">
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                handleToggleRole(member.user_id, member.role);
+                              }}
+                              disabled={loading}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground transition-colors text-left disabled:opacity-50"
+                            >
+                              {member.role === 'admin' ? (
+                                <>
+                                  <ShieldOff className="w-4 h-4" />
+                                  Remove Admin
+                                </>
+                              ) : (
+                                <>
+                                  <Shield className="w-4 h-4" />
+                                  Make Admin
+                                </>
+                              )}
+                            </button>
+                            <button
+                              onClick={() => {
+                                setOpenMenuId(null);
+                                handleRemoveMember(member.user_id);
+                              }}
+                              disabled={loading}
+                              className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent text-red-600 dark:text-red-400 transition-colors text-left disabled:opacity-50"
+                            >
+                              <UserMinus className="w-4 h-4" />
+                              Remove from Group
+                            </button>
+                          </div>
+                        </PopoverContent>
+                      </Popover>
                     )}
                   </div>
                 </div>
