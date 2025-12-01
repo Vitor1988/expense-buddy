@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { BottomNav } from '@/components/layout/bottom-nav';
+import { RecurringProcessor } from '@/components/layout/recurring-processor';
 
 export default async function DashboardLayout({
   children,
@@ -20,6 +21,7 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+      <RecurringProcessor />
       <Sidebar />
       <div className="md:ml-64">
         <Header user={user} />
