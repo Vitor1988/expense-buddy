@@ -25,12 +25,12 @@ export default async function DashboardLayout({
       <RecurringProcessor />
       <Sidebar />
       <div className="md:ml-64">
-        <Header user={user} />
-        <main className="p-4 md:p-6 pb-24 md:pb-6">
-          <PullToRefresh>
+        <PullToRefresh>
+          <Header user={user} />
+          <main className="p-4 md:p-6 pb-24 md:pb-6">
             {children}
-          </PullToRefresh>
-        </main>
+          </main>
+        </PullToRefresh>
       </div>
       <BottomNav />
     </div>

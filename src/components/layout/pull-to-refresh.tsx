@@ -63,8 +63,16 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
         </div>
       </div>
 
-      {/* Content */}
-      {children}
+      {/* Content - slides down when pulling/refreshing */}
+      <div
+        className="transition-transform duration-200"
+        style={{
+          transform: `translateY(${refreshing ? 50 : pullDistance}px)`,
+          transitionDuration: pulling ? '0ms' : '200ms'
+        }}
+      >
+        {children}
+      </div>
     </div>
   );
 }
