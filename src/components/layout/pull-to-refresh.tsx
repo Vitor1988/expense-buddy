@@ -58,22 +58,29 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      className="relative"
+      className="relative overflow-hidden"
     >
-      {/* Pull indicator */}
-      {(pullDistance > 0 || refreshing) && (
-        <div
-          className="absolute left-1/2 -translate-x-1/2 flex items-center justify-center transition-transform z-10"
-          style={{ top: Math.min(pullDistance - 40, THRESHOLD - 40) }}
-        >
-          <div className={`p-2 rounded-full bg-white dark:bg-gray-800 shadow-lg ${refreshing ? 'animate-spin' : ''}`}>
-            <Loader2 className={`w-5 h-5 text-emerald-500 ${pullDistance >= THRESHOLD || refreshing ? 'opacity-100' : 'opacity-50'}`} />
-          </div>
+      {/* Pull indicator - positioned above content */}
+      <div
+        className="absolute left-0 right-0 flex items-center justify-center z-10 pointer-events-none transition-opacity duration-200"
+        style={{
+          top: -50 + (refreshing ? THRESHOLD * 0.6 : pullDistance),
+          opacity: pullDistance > 10 || refreshing ? 1 : 0
+        }}
+      >
+        <div className={`p-2 rounded-full bg-white dark:bg-gray-800 shadow-lg ${refreshing ? 'animate-spin' : ''}`}>
+          <Loader2 className={`w-5 h-5 text-emerald-500 ${pullDistance >= THRESHOLD || refreshing ? 'opacity-100' : 'opacity-50'}`} />
         </div>
-      )}
+      </div>
 
       {/* Content with pull offset */}
-      <div style={{ transform: `translateY(${refreshing ? THRESHOLD * 0.5 : pullDistance}px)` }}>
+      <div
+        className="transition-transform duration-200"
+        style={{
+          transform: `translateY(${refreshing ? THRESHOLD * 0.5 : pullDistance}px)`,
+          transitionDuration: pulling ? '0ms' : '200ms'
+        }}
+      >
         {children}
       </div>
     </div>
