@@ -4,7 +4,7 @@ import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
-const THRESHOLD = 80;
+const THRESHOLD = 50;
 
 export function PullToRefresh({ children }: { children: React.ReactNode }) {
   const router = useRouter();
@@ -28,7 +28,7 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
     const diff = currentY - startY.current;
 
     if (diff > 0) {
-      setPullDistance(Math.min(diff * 0.5, THRESHOLD * 1.5));
+      setPullDistance(Math.min(diff * 0.4, 60));
     }
   }, [pulling, refreshing]);
 
@@ -54,7 +54,7 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
       <div
         className="fixed left-0 right-0 flex justify-center pointer-events-none z-50 transition-all duration-200"
         style={{
-          top: -40 + (refreshing ? 50 : pullDistance),
+          top: -40 + (refreshing ? 40 : pullDistance),
           opacity: pullDistance > 10 || refreshing ? 1 : 0
         }}
       >
@@ -67,7 +67,7 @@ export function PullToRefresh({ children }: { children: React.ReactNode }) {
       <div
         className="transition-transform duration-200"
         style={{
-          transform: `translateY(${refreshing ? 50 : pullDistance}px)`,
+          transform: `translateY(${refreshing ? 40 : pullDistance}px)`,
           transitionDuration: pulling ? '0ms' : '200ms'
         }}
       >
