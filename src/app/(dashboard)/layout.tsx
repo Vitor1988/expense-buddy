@@ -4,6 +4,7 @@ import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { BottomNav } from '@/components/layout/bottom-nav';
 import { RecurringProcessor } from '@/components/layout/recurring-processor';
+import { PullToRefresh } from '@/components/layout/pull-to-refresh';
 
 export default async function DashboardLayout({
   children,
@@ -25,7 +26,11 @@ export default async function DashboardLayout({
       <Sidebar />
       <div className="md:ml-64">
         <Header user={user} />
-        <main className="p-4 md:p-6 pb-24 md:pb-6">{children}</main>
+        <main className="p-4 md:p-6 pb-24 md:pb-6">
+          <PullToRefresh>
+            {children}
+          </PullToRefresh>
+        </main>
       </div>
       <BottomNav />
     </div>
