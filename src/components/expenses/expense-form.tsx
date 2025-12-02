@@ -85,6 +85,7 @@ export function ExpenseForm({ categories, expense, action, currency = 'USD' }: E
                 expense?.date ||
                 new Date().toISOString().split('T')[0]
               }
+              max={new Date().toISOString().split('T')[0]}
               required
             />
           </div>

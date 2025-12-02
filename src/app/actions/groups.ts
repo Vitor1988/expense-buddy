@@ -130,6 +130,15 @@ export async function deleteGroup(groupId: string) {
     return { error: 'Only admins can delete the group' };
   }
 
+  // Check if there are any unsettled balances in the group
+  const { data: balances } = await getGroupBalances(groupId);
+  if (balances) {
+    const hasUnsettledDebts = balances.some(b => Math.abs(b.net_balance) > 0.01);
+    if (hasUnsettledDebts) {
+      return { error: 'Cannot delete group with unsettled debts. Please settle all balances first.' };
+    }
+  }
+
   const { error } = await supabase
     .from('expense_groups')
     .delete()
@@ -1295,6 +1304,21 @@ export async function removeMemberFromGroup(groupId: string, userId: string) {
     return { error: 'Use Leave Group to remove yourself' };
   }
 
+  // Check if member has unsettled debts
+  const { data: balances } = await getGroupBalances(groupId);
+  if (balances) {
+    const memberBalance = balances.find(b => b.user_id === userId);
+    // Use threshold of 0.01 to account for rounding errors
+    if (memberBalance && Math.abs(memberBalance.net_balance) > 0.01) {
+      const amount = Math.abs(memberBalance.net_balance).toFixed(2);
+      if (memberBalance.net_balance > 0) {
+        return { error: `Cannot remove member with unsettled debts. Others owe them ${amount}. Please settle first.` };
+      } else {
+        return { error: `Cannot remove member with unsettled debts. They owe ${amount}. Please settle first.` };
+      }
+    }
+  }
+
   const { error } = await supabase
     .from('group_members')
     .delete()
@@ -1387,6 +1411,21 @@ export async function leaveGroup(groupId: string) {
     }
   }
 
+  // Check if user has unsettled debts
+  const { data: balances } = await getGroupBalances(groupId);
+  if (balances) {
+    const userBalance = balances.find(b => b.user_id === user.id);
+    // Use threshold of 0.01 to account for rounding errors
+    if (userBalance && Math.abs(userBalance.net_balance) > 0.01) {
+      const amount = Math.abs(userBalance.net_balance).toFixed(2);
+      if (userBalance.net_balance > 0) {
+        return { error: `You cannot leave with unsettled debts. Others owe you ${amount}. Please settle first.` };
+      } else {
+        return { error: `You cannot leave with unsettled debts. You owe ${amount}. Please settle first.` };
+      }
+    }
+  }
+
   const { error } = await supabase
     .from('group_members')
     .delete()
@@ -1453,6 +1492,29 @@ export async function recordSettlement(
   // Amount must be positive
   if (amount <= 0) {
     return { error: 'Amount must be greater than 0' };
+  }
+
+  // Validate that user owes money and recipient is owed money
+  const { data: balances } = await getGroupBalances(groupId);
+  if (balances) {
+    const userBalance = balances.find(b => b.user_id === user.id);
+    const recipientBalance = balances.find(b => b.user_id === toUserId);
+
+    // User should have negative balance (owes money)
+    if (userBalance && userBalance.net_balance >= 0) {
+      return { error: 'You don\'t owe any money to settle.' };
+    }
+
+    // Recipient should have positive balance (is owed money)
+    if (recipientBalance && recipientBalance.net_balance <= 0) {
+      return { error: 'This member is not owed any money.' };
+    }
+
+    // Amount shouldn't exceed what user owes
+    if (userBalance && amount > Math.abs(userBalance.net_balance) + 0.01) {
+      const maxAmount = Math.abs(userBalance.net_balance).toFixed(2);
+      return { error: `Amount exceeds your total debt. Maximum you can settle: ${maxAmount}` };
+    }
   }
 
   const { data, error } = await supabase
