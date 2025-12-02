@@ -94,66 +94,68 @@ export function MonthlyExpenseCard({ data, currency, defaultExpanded = false }: 
         </div>
       )}
 
-      {/* Expandable content */}
+      {/* Expandable content - uses CSS Grid for smooth height animation */}
       <div
         className={cn(
-          'overflow-hidden transition-all duration-300 ease-in-out',
-          isExpanded ? 'max-h-[2000px] opacity-100' : 'max-h-0 opacity-0'
+          'grid transition-[grid-template-rows] duration-300 ease-out',
+          isExpanded ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]'
         )}
       >
-        <div className="border-t border-gray-200 dark:border-gray-800">
-          {data.expenses.length === 0 ? (
-            <div className="p-6 text-center text-gray-500 dark:text-gray-400">
-              No expenses this month
-            </div>
-          ) : (
-            <>
-              {/* Expense list */}
-              <div className="p-2">
-                {displayedExpenses.map((expense) => (
-                  <ExpenseListItem
-                    key={expense.id}
-                    expense={expense}
-                    currency={currency}
-                  />
-                ))}
+        <div className="overflow-hidden">
+          <div className="border-t border-gray-200 dark:border-gray-800">
+            {data.expenses.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 dark:text-gray-400">
+                No expenses this month
               </div>
-
-              {/* Show more button */}
-              {hasMoreExpenses && !showAllExpenses && (
-                <div className="px-4 pb-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAllExpenses(true);
-                    }}
-                  >
-                    Show {remainingExpenses} more expense{remainingExpenses !== 1 ? 's' : ''}
-                  </Button>
+            ) : (
+              <>
+                {/* Expense list */}
+                <div className="p-2">
+                  {displayedExpenses.map((expense) => (
+                    <ExpenseListItem
+                      key={expense.id}
+                      expense={expense}
+                      currency={currency}
+                    />
+                  ))}
                 </div>
-              )}
 
-              {/* Show less button */}
-              {showAllExpenses && hasMoreExpenses && (
-                <div className="px-4 pb-4">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="w-full text-gray-500 dark:text-gray-400"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setShowAllExpenses(false);
-                    }}
-                  >
-                    Show less
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
+                {/* Show more button */}
+                {hasMoreExpenses && !showAllExpenses && (
+                  <div className="px-4 pb-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllExpenses(true);
+                      }}
+                    >
+                      Show {remainingExpenses} more expense{remainingExpenses !== 1 ? 's' : ''}
+                    </Button>
+                  </div>
+                )}
+
+                {/* Show less button */}
+                {showAllExpenses && hasMoreExpenses && (
+                  <div className="px-4 pb-4">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="w-full text-gray-500 dark:text-gray-400"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setShowAllExpenses(false);
+                      }}
+                    >
+                      Show less
+                    </Button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
         </div>
       </div>
     </Card>
