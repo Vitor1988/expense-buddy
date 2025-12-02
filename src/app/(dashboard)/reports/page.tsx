@@ -79,6 +79,7 @@ interface TopExpense {
 export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [currency, setCurrency] = useState<CurrencyCode>('USD');
+  const [activePreset, setActivePreset] = useState<string | null>('thisMonth');
   const [dateRange, setDateRange] = useState({
     start: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
     end: new Date().toISOString().split('T')[0],
@@ -145,6 +146,7 @@ export default function ReportsPage() {
   };
 
   const setPresetRange = (preset: string) => {
+    setActivePreset(preset);
     const now = new Date();
     let start: Date;
     let end = now;
@@ -180,11 +182,36 @@ export default function ReportsPage() {
   // Calculate summary stats
   const totalSpent = categoryData.reduce((sum, c) => sum + c.value, 0);
 
-  // Calculate actual days in the selected date range
-  const rangeStart = new Date(dateRange.start);
-  const rangeEnd = new Date(dateRange.end);
-  const daysInRange = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-  const avgDaily = daysInRange > 0 ? totalSpent / daysInRange : 0;
+  // Calculate days for daily average based on preset or actual range
+  const getDaysForAverage = () => {
+    const rangeStart = new Date(dateRange.start);
+    const rangeEnd = new Date(dateRange.end);
+
+    switch (activePreset) {
+      case 'thisWeek':
+        return 7;
+      case 'thisMonth':
+        // Days in the current month
+        return new Date(rangeStart.getFullYear(), rangeStart.getMonth() + 1, 0).getDate();
+      case 'lastMonth':
+        // Days in the previous month
+        return new Date(rangeStart.getFullYear(), rangeStart.getMonth() + 1, 0).getDate();
+      case 'last3Months':
+        // ~90 days (3 months average)
+        return 90;
+      case 'thisYear': {
+        // Days in the year (handle leap years)
+        const year = rangeStart.getFullYear();
+        return ((year % 4 === 0 && year % 100 !== 0) || year % 400 === 0) ? 366 : 365;
+      }
+      default:
+        // Custom range: use actual days
+        return Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    }
+  };
+
+  const daysForAverage = getDaysForAverage();
+  const avgDaily = daysForAverage > 0 ? totalSpent / daysForAverage : 0;
 
   // Compare with previous period
   const currentMonth = monthlyData[monthlyData.length - 1]?.amount || 0;
@@ -274,7 +301,10 @@ export default function ReportsPage() {
                 <Input
                   type="date"
                   value={dateRange.start}
-                  onChange={(e) => setDateRange({ ...dateRange, start: e.target.value })}
+                  onChange={(e) => {
+                    setActivePreset(null);
+                    setDateRange({ ...dateRange, start: e.target.value });
+                  }}
                   className="w-auto"
                 />
               </div>
@@ -284,7 +314,10 @@ export default function ReportsPage() {
                 <Input
                   type="date"
                   value={dateRange.end}
-                  onChange={(e) => setDateRange({ ...dateRange, end: e.target.value })}
+                  onChange={(e) => {
+                    setActivePreset(null);
+                    setDateRange({ ...dateRange, end: e.target.value });
+                  }}
                   className="w-auto"
                 />
               </div>
