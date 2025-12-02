@@ -179,9 +179,12 @@ export default function ReportsPage() {
 
   // Calculate summary stats
   const totalSpent = categoryData.reduce((sum, c) => sum + c.value, 0);
-  const avgDaily = trendData.length > 0
-    ? trendData.reduce((sum, d) => sum + d.amount, 0) / trendData.length
-    : 0;
+
+  // Calculate actual days in the selected date range
+  const rangeStart = new Date(dateRange.start);
+  const rangeEnd = new Date(dateRange.end);
+  const daysInRange = Math.ceil((rangeEnd.getTime() - rangeStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  const avgDaily = daysInRange > 0 ? totalSpent / daysInRange : 0;
 
   // Compare with previous period
   const currentMonth = monthlyData[monthlyData.length - 1]?.amount || 0;
