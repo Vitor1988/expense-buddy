@@ -131,62 +131,60 @@ export async function getBudgetProgress() {
     .select('*, category:categories(*)')
     .eq('user_id', user.id);
 
-  if (!budgets) return { data: [], error: null };
+  if (!budgets || budgets.length === 0) return { data: [], error: null };
 
-  // Calculate date ranges based on period
+  // Calculate date ranges for each period type
   const now = new Date();
-  const getDateRange = (period: string) => {
-    switch (period) {
-      case 'weekly': {
-        const start = new Date(now);
-        start.setDate(now.getDate() - now.getDay());
-        start.setHours(0, 0, 0, 0);
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        return { start, end };
-      }
-      case 'monthly': {
-        const start = new Date(now.getFullYear(), now.getMonth(), 1);
-        const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        return { start, end };
-      }
-      case 'yearly': {
-        const start = new Date(now.getFullYear(), 0, 1);
-        const end = new Date(now.getFullYear(), 11, 31);
-        return { start, end };
-      }
-      default:
-        return { start: now, end: now };
-    }
+  const dateRanges = {
+    weekly: (() => {
+      const start = new Date(now);
+      start.setDate(now.getDate() - now.getDay());
+      start.setHours(0, 0, 0, 0);
+      const end = new Date(start);
+      end.setDate(start.getDate() + 6);
+      return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+    })(),
+    monthly: {
+      start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0],
+      end: new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0],
+    },
+    yearly: {
+      start: new Date(now.getFullYear(), 0, 1).toISOString().split('T')[0],
+      end: new Date(now.getFullYear(), 11, 31).toISOString().split('T')[0],
+    },
   };
 
-  // Get spending for each budget
-  const budgetProgress = await Promise.all(
-    budgets.map(async (budget) => {
-      const { start, end } = getDateRange(budget.period);
+  // Find the widest date range needed (yearly is always widest)
+  const hasYearly = budgets.some(b => b.period === 'yearly');
+  const earliestStart = hasYearly ? dateRanges.yearly.start : dateRanges.monthly.start;
 
-      let query = supabase
-        .from('expenses')
-        .select('amount')
-        .eq('user_id', user.id)
-        .gte('date', start.toISOString().split('T')[0])
-        .lte('date', end.toISOString().split('T')[0]);
+  // Fetch ALL expenses in a single query
+  const { data: allExpenses } = await supabase
+    .from('expenses')
+    .select('amount, category_id, date')
+    .eq('user_id', user.id)
+    .gte('date', earliestStart)
+    .lte('date', dateRanges.yearly.end);
 
-      if (budget.category_id) {
-        query = query.eq('category_id', budget.category_id);
-      }
+  // Process in memory to calculate spending per budget
+  const budgetProgress = budgets.map((budget) => {
+    const range = dateRanges[budget.period as keyof typeof dateRanges];
 
-      const { data: expenses } = await query;
-      const spent = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+    const spent = (allExpenses || [])
+      .filter(e => {
+        const inDateRange = e.date >= range.start && e.date <= range.end;
+        const matchesCategory = budget.category_id ? e.category_id === budget.category_id : true;
+        return inDateRange && matchesCategory;
+      })
+      .reduce((sum, e) => sum + Number(e.amount), 0);
 
-      return {
-        ...budget,
-        spent,
-        percentage: (spent / budget.amount) * 100,
-        remaining: Math.max(0, budget.amount - spent),
-      };
-    })
-  );
+    return {
+      ...budget,
+      spent,
+      percentage: (spent / budget.amount) * 100,
+      remaining: Math.max(0, budget.amount - spent),
+    };
+  });
 
   return { data: budgetProgress, error: null };
 }

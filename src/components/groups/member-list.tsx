@@ -9,6 +9,7 @@ import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover'
 import { Crown, MoreVertical, UserMinus, Shield, ShieldOff, Clock, X, Mail } from 'lucide-react';
 import { toast } from 'sonner';
 import { MemberInviteForm } from './member-invite-form';
+import { DeleteConfirmationDialog } from '@/components/shared';
 import { getPendingInvitations, cancelInvitation, removeMemberFromGroup, updateMemberRole } from '@/app/actions/groups';
 import type { GroupMember } from '@/types';
 
@@ -24,6 +25,7 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
   const [pendingInvites, setPendingInvites] = useState<{ id: string; invited_email: string; created_at: string; token: string }[]>([]);
   const [loading, setLoading] = useState(false);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [memberToRemove, setMemberToRemove] = useState<string | null>(null);
 
   // Check if current user is admin
   const currentMember = members.find((m) => m.user_id === currentUserId);
@@ -45,22 +47,24 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
   const handleCancelInvite = async (inviteId: string) => {
     setLoading(true);
     const result = await cancelInvitation(inviteId);
-    if (!result.error) {
+    if (result.error) {
+      toast.error(result.error);
+    } else {
       setPendingInvites((prev) => prev.filter((i) => i.id !== inviteId));
+      toast.success('Invitation cancelled');
     }
     setLoading(false);
   };
 
-  const handleRemoveMember = async (userId: string) => {
-    if (!confirm('Are you sure you want to remove this member?')) return;
-    setLoading(true);
-    const result = await removeMemberFromGroup(groupId, userId);
+  const handleRemoveMember = async () => {
+    if (!memberToRemove) return;
+    const result = await removeMemberFromGroup(groupId, memberToRemove);
     if (result.error) {
       toast.error(result.error);
     } else {
       toast.success('Member removed');
     }
-    setLoading(false);
+    setMemberToRemove(null);
   };
 
   const handleToggleRole = async (userId: string, currentRole: string) => {
@@ -224,7 +228,7 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
                             <button
                               onClick={() => {
                                 setOpenMenuId(null);
-                                handleRemoveMember(member.user_id);
+                                setMemberToRemove(member.user_id);
                               }}
                               disabled={loading}
                               className="flex items-center gap-2 w-full px-2 py-1.5 text-sm rounded-sm hover:bg-accent text-red-600 dark:text-red-400 transition-colors text-left disabled:opacity-50"
@@ -243,6 +247,16 @@ export function MemberList({ groupId, members, currentUserId }: MemberListProps)
           );
         })}
       </div>
+
+      {/* Remove member confirmation dialog */}
+      <DeleteConfirmationDialog
+        open={!!memberToRemove}
+        onOpenChange={(open) => !open && setMemberToRemove(null)}
+        onConfirm={handleRemoveMember}
+        title="Remove Member"
+        description="Are you sure you want to remove this member from the group? They will lose access to all group expenses."
+        confirmText="Remove"
+      />
     </div>
   );
 }

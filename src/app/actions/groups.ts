@@ -679,50 +679,6 @@ async function calculateUserBalancesForGroups(
   return balances;
 }
 
-// Kept for potential single-user balance calculations (currently unused after batch optimization)
-async function _calculateUserBalanceInGroup(groupId: string, userId: string): Promise<number> {
-  const supabase = await createClient();
-
-  // Get all expenses user paid for
-  const { data: paidExpenses } = await supabase
-    .from('shared_expenses')
-    .select('amount')
-    .eq('group_id', groupId)
-    .eq('paid_by', userId);
-
-  const totalPaid = (paidExpenses || []).reduce((sum, e) => sum + Number(e.amount), 0);
-
-  // Get all splits where user owes money
-  const { data: splits } = await supabase
-    .from('expense_splits')
-    .select('amount, shared_expense_id, shared_expenses!inner(group_id)')
-    .eq('user_id', userId)
-    .eq('shared_expenses.group_id', groupId);
-
-  const totalOwed = (splits || []).reduce((sum, s) => sum + Number(s.amount), 0);
-
-  // Get settlements where user paid
-  const { data: paidSettlements } = await supabase
-    .from('settlements')
-    .select('amount')
-    .eq('group_id', groupId)
-    .eq('from_user_id', userId);
-
-  const totalSettledPaid = (paidSettlements || []).reduce((sum, s) => sum + Number(s.amount), 0);
-
-  // Get settlements where user received
-  const { data: receivedSettlements } = await supabase
-    .from('settlements')
-    .select('amount')
-    .eq('group_id', groupId)
-    .eq('to_user_id', userId);
-
-  const totalSettledReceived = (receivedSettlements || []).reduce((sum, s) => sum + Number(s.amount), 0);
-
-  // Balance: positive = others owe you, negative = you owe others
-  return totalPaid - totalOwed + totalSettledPaid - totalSettledReceived;
-}
-
 export async function getGroupBalances(groupId: string): Promise<{
   data: GroupBalance[] | null;
   error: string | null;
@@ -916,8 +872,8 @@ export async function sendInvitation(groupId: string, email: string) {
     return { error: 'Only admins can invite members' };
   }
 
-  // Validate email
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  // Validate email (HTML5 email validation pattern)
+  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
   if (!emailRegex.test(email)) {
     return { error: 'Please enter a valid email address' };
   }
