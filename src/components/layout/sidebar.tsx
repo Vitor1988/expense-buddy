@@ -30,7 +30,7 @@ export function Sidebar() {
   const pathname = usePathname();
 
   return (
-    <aside className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-screen fixed left-0 top-0">
+    <aside role="navigation" aria-label="Main navigation" className="hidden md:flex flex-col w-64 bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 h-screen fixed left-0 top-0">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 h-16 border-b border-gray-200 dark:border-gray-800">
         <div className="w-10 h-10 rounded-xl bg-emerald-500 flex items-center justify-center">
