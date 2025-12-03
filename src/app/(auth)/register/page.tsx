@@ -25,15 +25,25 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [currency, setCurrency] = useState('USD');
 
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
     setIsLoading(true);
     setError(null);
 
+    const formData = new FormData(e.currentTarget);
     formData.set('currency', currency);
     const result = await signUp(formData);
 
     if (result?.error) {
-      setError(result.error);
+      // Friendly message for rate limiting
+      const errorLower = result.error.toLowerCase();
+      if (errorLower.includes('rate') ||
+          errorLower.includes('security') ||
+          errorLower.includes('too many')) {
+        setError('Too many attempts. Please wait a moment and try again.');
+      } else {
+        setError(result.error);
+      }
       setIsLoading(false);
       return;
     }
@@ -46,7 +56,7 @@ export default function RegisterPage() {
 
   return (
     <Card className="border-0 shadow-xl">
-      <form action={handleSubmit}>
+      <form onSubmit={handleSubmit}>
         <CardContent className="pt-6 space-y-4">
           <div className="space-y-2">
             <Label htmlFor="fullName">Full Name</Label>
