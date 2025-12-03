@@ -19,11 +19,48 @@ interface CategoryFormProps {
   onOpenChange: (open: boolean) => void;
 }
 
-const EMOJI_OPTIONS = ['🍔', '🚗', '🛍️', '🎬', '💡', '💊', '✈️', '📚', '💅', '📦', '🏠', '💰', '🎮', '☕', '🎁', '🏋️', '🎵', '🐕'];
+const EMOJI_OPTIONS = [
+  // Food & Drinks
+  '🍔', '🍕', '🍜', '🍣', '🥗', '☕', '🍺', '🍷', '🧁', '🍰',
+  // Transport
+  '🚗', '🚌', '🚇', '✈️', '🚲', '⛽', '🚕', '🛵', '🚀',
+  // Shopping
+  '🛍️', '🛒', '👕', '👟', '💎', '🎁', '👜', '🧴',
+  // Entertainment
+  '🎬', '🎮', '🎵', '📺', '🎭', '🎨', '📷', '🎤', '🎧',
+  // Home & Bills
+  '🏠', '💡', '📱', '💻', '🔌', '🛋️', '🔑', '📡',
+  // Health & Fitness
+  '💊', '🏥', '🏋️', '🧘', '💆', '🩺', '💉',
+  // Education & Work
+  '📚', '🎓', '💼', '📝', '🖊️', '📎',
+  // Pets & Nature
+  '🐕', '🐈', '🌱', '🌳', '🐾', '🦜',
+  // Finance
+  '💰', '💳', '🏦', '📈', '💵', '🪙',
+  // Other
+  '📦', '🔧', '✂️', '🎯', '⭐', '❤️', '🔥', '💡',
+];
 
 const COLOR_OPTIONS = [
-  '#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6',
-  '#8b5cf6', '#ec4899', '#06b6d4', '#f43f5e', '#6b7280',
+  // Reds
+  '#ef4444', '#dc2626', '#b91c1c',
+  // Oranges
+  '#f97316', '#ea580c',
+  // Yellows/Amber
+  '#eab308', '#ca8a04', '#f59e0b',
+  // Greens
+  '#22c55e', '#16a34a', '#15803d', '#10b981',
+  // Blues
+  '#3b82f6', '#2563eb', '#1d4ed8', '#0ea5e9',
+  // Purples
+  '#8b5cf6', '#7c3aed', '#6d28d9', '#a855f7',
+  // Pinks
+  '#ec4899', '#db2777', '#f43f5e', '#e11d48',
+  // Cyans/Teals
+  '#06b6d4', '#0891b2', '#14b8a6',
+  // Grays
+  '#6b7280', '#4b5563', '#374151',
 ];
 
 export function CategoryForm({ category, action, open, onOpenChange }: CategoryFormProps) {
@@ -62,7 +99,7 @@ export function CategoryForm({ category, action, open, onOpenChange }: CategoryF
 
           <div className="space-y-2">
             <Label>Icon</Label>
-            <div className="grid grid-cols-9 gap-2">
+            <div className="grid grid-cols-10 gap-2">
               {EMOJI_OPTIONS.map((emoji) => (
                 <label key={emoji} className="cursor-pointer">
                   <input
