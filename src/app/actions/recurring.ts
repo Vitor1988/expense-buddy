@@ -204,6 +204,19 @@ export async function processRecurringExpenses() {
   let processed = 0;
 
   for (const recurring of dueExpenses) {
+    // Check if expense already exists for this recurring_id and date (prevent duplicates)
+    const { data: existingExpense } = await supabase
+      .from('expenses')
+      .select('id')
+      .eq('recurring_id', recurring.id)
+      .eq('date', recurring.next_date)
+      .single();
+
+    if (existingExpense) {
+      // Already processed, skip to next
+      continue;
+    }
+
     // Create the expense
     const { error: insertError } = await supabase.from('expenses').insert({
       user_id: user.id,
@@ -215,7 +228,10 @@ export async function processRecurringExpenses() {
       tags: [],
     });
 
-    if (insertError) continue;
+    if (insertError) {
+      console.error('Failed to create recurring expense:', insertError.message);
+      continue;
+    }
 
     // Calculate next date based on frequency
     const nextDate = new Date(recurring.next_date);

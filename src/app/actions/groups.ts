@@ -878,26 +878,6 @@ export async function sendInvitation(groupId: string, email: string) {
     return { error: 'Please enter a valid email address' };
   }
 
-  // Check if email is already a member
-  const { data: existingUser } = await supabase
-    .from('profiles')
-    .select('id')
-    .eq('id', (await supabase.from('auth.users').select('id').eq('email', email).single()).data?.id)
-    .single();
-
-  if (existingUser) {
-    const { data: existingMember } = await supabase
-      .from('group_members')
-      .select('id')
-      .eq('group_id', groupId)
-      .eq('user_id', existingUser.id)
-      .single();
-
-    if (existingMember) {
-      return { error: 'This person is already a member of the group' };
-    }
-  }
-
   // Check if there's already a pending invitation
   const { data: existingInvite } = await supabase
     .from('group_invitations')
@@ -1061,9 +1041,12 @@ export async function acceptInvitation(token: string) {
 export async function declineInvitation(token: string) {
   const supabase = await createClient();
 
+  // Get current user (optional - token is already secret, but good for logging)
+  const { data: { user } } = await supabase.auth.getUser();
+
   const { data: invitation, error: inviteError } = await supabase
     .from('group_invitations')
-    .select('id, status')
+    .select('id, status, invited_email')
     .eq('token', token)
     .single();
 
@@ -1073,6 +1056,11 @@ export async function declineInvitation(token: string) {
 
   if (invitation.status !== 'pending') {
     return { error: `This invitation has already been ${invitation.status}` };
+  }
+
+  // Log for audit purposes (optional security measure)
+  if (user) {
+    console.log(`User ${user.id} declined invitation for ${invitation.invited_email}`);
   }
 
   const { error } = await supabase

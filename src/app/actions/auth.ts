@@ -50,7 +50,8 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     });
 
     if (profileError) {
-      // Profile creation failed - user may need to create profile manually later
+      console.error('Profile creation failed:', profileError.message);
+      // Continue anyway - user can still use the app, profile will be created on first access
     }
 
     // Create default categories for the user
@@ -65,7 +66,11 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
       { name: 'Other', icon: 'circle-ellipsis', color: '#6b7280', user_id: data.user.id, is_default: true },
     ];
 
-    await supabase.from('categories').insert(defaultCategories);
+    const { error: categoriesError } = await supabase.from('categories').insert(defaultCategories);
+    if (categoriesError) {
+      console.error('Default categories creation failed:', categoriesError.message);
+      // Continue anyway - user can create categories manually
+    }
 
     // Check if email confirmation is required
     // If user.identities is empty or email is not confirmed, redirect to confirmation page
