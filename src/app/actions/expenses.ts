@@ -147,11 +147,22 @@ export async function getExpenses(filters?: {
   return { data, error: dbError?.message };
 }
 
+// Sort options for expenses
+const SORT_OPTIONS: Record<string, { column: string; ascending: boolean }> = {
+  date_desc: { column: 'date', ascending: false },
+  date_asc: { column: 'date', ascending: true },
+  amount_desc: { column: 'amount', ascending: false },
+  amount_asc: { column: 'amount', ascending: true },
+};
+
 export async function getExpensesPaginated(filters?: {
   startDate?: string;
   endDate?: string;
   categoryId?: string;
   search?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  sort?: string;
   page?: number;
   limit?: number;
 }) {
@@ -164,18 +175,21 @@ export async function getExpensesPaginated(filters?: {
   const limit = filters?.limit || 20;
   const offset = (page - 1) * limit;
 
+  // Get sort configuration (default: date descending)
+  const sortConfig = SORT_OPTIONS[filters?.sort || 'date_desc'] || SORT_OPTIONS.date_desc;
+
   // Build base query for counting
   let countQuery = supabase
     .from('expenses')
     .select('id', { count: 'exact', head: true })
     .eq('user_id', user.id);
 
-  // Build data query
+  // Build data query with sorting
   let dataQuery = supabase
     .from('expenses')
     .select('*, category:categories(*)')
     .eq('user_id', user.id)
-    .order('date', { ascending: false })
+    .order(sortConfig.column, { ascending: sortConfig.ascending })
     .range(offset, offset + limit - 1);
 
   // Apply filters to both queries
@@ -197,6 +211,17 @@ export async function getExpensesPaginated(filters?: {
   if (filters?.search) {
     countQuery = countQuery.ilike('description', `%${filters.search}%`);
     dataQuery = dataQuery.ilike('description', `%${filters.search}%`);
+  }
+
+  // Amount range filters
+  if (filters?.minAmount !== undefined && filters.minAmount > 0) {
+    countQuery = countQuery.gte('amount', filters.minAmount);
+    dataQuery = dataQuery.gte('amount', filters.minAmount);
+  }
+
+  if (filters?.maxAmount !== undefined && filters.maxAmount > 0) {
+    countQuery = countQuery.lte('amount', filters.maxAmount);
+    dataQuery = dataQuery.lte('amount', filters.maxAmount);
   }
 
   // Execute both queries in parallel

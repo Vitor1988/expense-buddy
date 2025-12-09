@@ -16,6 +16,9 @@ interface ExpensesPageProps {
     category?: string;
     startDate?: string;
     endDate?: string;
+    minAmount?: string;
+    maxAmount?: string;
+    sort?: string;
     page?: string;
   }>;
 }
@@ -47,12 +50,15 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   // Get current page from params
   const currentPage = params?.page ? parseInt(params.page, 10) : 1;
 
-  // Fetch paginated expenses
+  // Fetch paginated expenses with all filters
   const { data: expenses, total = 0, totalPages = 1 } = await getExpensesPaginated({
     search: params?.search,
     categoryId: params?.category,
     startDate: params?.startDate,
     endDate: params?.endDate,
+    minAmount: params?.minAmount ? parseFloat(params.minAmount) : undefined,
+    maxAmount: params?.maxAmount ? parseFloat(params.maxAmount) : undefined,
+    sort: params?.sort,
     page: currentPage,
     limit: ITEMS_PER_PAGE,
   });
@@ -60,13 +66,16 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   // Calculate totals for current page
   const totalAmount = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
 
-  // Build pagination URLs
+  // Build pagination URLs preserving all filters
   const buildPageUrl = (page: number) => {
     const urlParams = new URLSearchParams();
     if (params?.search) urlParams.set('search', params.search);
     if (params?.category) urlParams.set('category', params.category);
     if (params?.startDate) urlParams.set('startDate', params.startDate);
     if (params?.endDate) urlParams.set('endDate', params.endDate);
+    if (params?.minAmount) urlParams.set('minAmount', params.minAmount);
+    if (params?.maxAmount) urlParams.set('maxAmount', params.maxAmount);
+    if (params?.sort) urlParams.set('sort', params.sort);
     if (page > 1) urlParams.set('page', page.toString());
     const queryString = urlParams.toString();
     return `/expenses${queryString ? `?${queryString}` : ''}`;
@@ -145,7 +154,7 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-gray-500 dark:text-gray-400 mb-4">
-              {params?.search || params?.category || params?.startDate
+              {params?.search || params?.category || params?.startDate || params?.minAmount || params?.maxAmount
                 ? 'Try adjusting your filters'
                 : 'Start tracking your spending by adding your first expense'}
             </p>
