@@ -85,7 +85,7 @@ export function CategoryForm({ category, action, open, onOpenChange }: CategoryF
         <DialogHeader>
           <DialogTitle>{category ? 'Edit Category' : 'New Category'}</DialogTitle>
         </DialogHeader>
-        <form action={handleSubmit} className="space-y-4">
+        <form action={handleSubmit} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1">
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
