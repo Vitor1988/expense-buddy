@@ -67,7 +67,7 @@ export function SpendingPieChart({ data, currency = 'USD' }: SpendingPieChartPro
                 ))}
               </Pie>
               <Tooltip
-                formatter={(value: number) => [formatter.format(value), 'Amount']}
+                formatter={(value) => [formatter.format(value as number), 'Amount']}
               />
             </PieChart>
           </ResponsiveContainer>

@@ -68,7 +68,7 @@ export function MonthlyComparisonChart({ data, currency = 'USD' }: MonthlyCompar
                 tickFormatter={(value) => `${currency === 'USD' ? '$' : ''}${value}`}
               />
               <Tooltip
-                formatter={(value: number) => [formatter.format(value), 'Spent']}
+                formatter={(value) => [formatter.format(value as number), 'Spent']}
               />
               <Bar
                 dataKey="amount"

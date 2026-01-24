@@ -236,7 +236,8 @@ describe('calculateSplits', () => {
   });
 
   it('should return error for invalid split method', () => {
-    const result = calculateSplits('invalid' as any, 100, ['user1', 'user2']);
+    // @ts-expect-error - testing invalid input
+    const result = calculateSplits('invalid', 100, ['user1', 'user2']);
     expect(result.error).toBe('Invalid split method');
   });
 

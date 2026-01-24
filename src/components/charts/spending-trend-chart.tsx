@@ -67,7 +67,7 @@ export function SpendingTrendChart({ data, currency = 'USD' }: SpendingTrendChar
                 tickFormatter={(value) => `${currency === 'USD' ? '$' : ''}${value}`}
               />
               <Tooltip
-                formatter={(value: number) => [formatter.format(value), 'Spent']}
+                formatter={(value) => [formatter.format(value as number), 'Spent']}
                 labelFormatter={(label) => new Date(label).toLocaleDateString('en-US', {
                   month: 'long',
                   day: 'numeric',
