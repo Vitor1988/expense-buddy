@@ -288,6 +288,11 @@ export interface UnifiedExpense {
   // Original data
   expense?: Expense;
   shared_expense?: SharedExpense;
+  // For bidirectional shared expenses
+  userRole?: 'payer' | 'debtor';  // 'payer' = paid for others, 'debtor' = owes money
+  splitId?: string;               // ID of the split (for settlement)
+  isSettled?: boolean;            // Whether user's debt is settled
+  owedTo?: string;                // Name of person user owes money to
 }
 
 // Form data for creating inline shared expense

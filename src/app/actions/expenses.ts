@@ -4,7 +4,7 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { formatMonthYear, getMonthDateRange, getPastMonthKeys } from '@/lib/utils';
-import type { MonthlyExpenseData, CategoryBreakdown, Expense, UnifiedExpense, SplitMethod } from '@/types';
+import type { MonthlyExpenseData, CategoryBreakdown, Expense, UnifiedExpense, SplitMethod, SharedExpense } from '@/types';
 import { calculateSplits, type SplitInput } from '@/lib/split-calculator';
 
 export async function createExpense(formData: FormData) {
@@ -528,10 +528,11 @@ export async function getUnifiedExpenses(filters?: {
     .eq('user_id', user.id);
 
   // Build inline shared expenses query (where group_id is null and user is payer)
-  let sharedQuery = supabase
+  let sharedPayerQuery = supabase
     .from('shared_expenses')
     .select(`
       *,
+      payer:profiles!paid_by(id, full_name),
       splits:expense_splits(
         id,
         user_id,
@@ -545,14 +546,39 @@ export async function getUnifiedExpenses(filters?: {
     .is('group_id', null)
     .eq('paid_by', user.id);
 
+  // Build query for expenses where user owes money (has a split)
+  let sharedOwedQuery = supabase
+    .from('expense_splits')
+    .select(`
+      id,
+      user_id,
+      amount,
+      is_settled,
+      shared_expense:shared_expenses!inner(
+        id,
+        amount,
+        description,
+        category,
+        date,
+        split_method,
+        paid_by,
+        payer:profiles!paid_by(id, full_name)
+      )
+    `)
+    .is('shared_expense.group_id', null)
+    .eq('user_id', user.id)
+    .neq('shared_expense.paid_by', user.id);  // Exclude expenses where user is payer
+
   // Apply date filters
   if (filters?.startDate) {
     expensesQuery = expensesQuery.gte('date', filters.startDate);
-    sharedQuery = sharedQuery.gte('date', filters.startDate);
+    sharedPayerQuery = sharedPayerQuery.gte('date', filters.startDate);
+    sharedOwedQuery = sharedOwedQuery.gte('shared_expense.date', filters.startDate);
   }
   if (filters?.endDate) {
     expensesQuery = expensesQuery.lte('date', filters.endDate);
-    sharedQuery = sharedQuery.lte('date', filters.endDate);
+    sharedPayerQuery = sharedPayerQuery.lte('date', filters.endDate);
+    sharedOwedQuery = sharedOwedQuery.lte('shared_expense.date', filters.endDate);
   }
 
   // Apply category filter (only to regular expenses)
@@ -563,13 +589,15 @@ export async function getUnifiedExpenses(filters?: {
   // Apply search filter
   if (filters?.search) {
     expensesQuery = expensesQuery.ilike('description', `%${filters.search}%`);
-    sharedQuery = sharedQuery.ilike('description', `%${filters.search}%`);
+    sharedPayerQuery = sharedPayerQuery.ilike('description', `%${filters.search}%`);
+    sharedOwedQuery = sharedOwedQuery.ilike('shared_expense.description', `%${filters.search}%`);
   }
 
-  // Execute both queries in parallel
-  const [expensesResult, sharedResult] = await Promise.all([
+  // Execute all queries in parallel
+  const [expensesResult, sharedPayerResult, sharedOwedResult] = await Promise.all([
     expensesQuery,
-    sharedQuery,
+    sharedPayerQuery,
+    sharedOwedQuery,
   ]);
 
   if (expensesResult.error) {
@@ -588,11 +616,11 @@ export async function getUnifiedExpenses(filters?: {
     expense: exp,
   }));
 
-  // Transform shared expenses to unified format
-  const sharedExpenses: UnifiedExpense[] = (sharedResult.data || []).map((se) => {
+  // Transform shared expenses where user is payer
+  const sharedPayerExpenses: UnifiedExpense[] = (sharedPayerResult.data || []).map((se) => {
     // Find user's own split to get their share
     const userSplit = se.splits?.find((s: { user_id: string | null }) => s.user_id === user.id);
-    // Other splits are those not belonging to the current user (either by user_id or by contact_id)
+    // Other splits are those not belonging to the current user
     const otherSplits = se.splits?.filter((s: { user_id: string | null }) => s.user_id !== user.id) || [];
 
     return {
@@ -610,17 +638,51 @@ export async function getUnifiedExpenses(filters?: {
         amount: number;
         is_settled: boolean;
       }) => ({
-        // Use contact name (for manual contacts) or profile name (for linked users)
         name: s.contact?.name || s.profile?.full_name || 'Unknown',
         amount: s.amount,
         settled: s.is_settled,
       })),
       shared_expense: se,
+      // Indicate user is the payer
+      userRole: 'payer' as const,
+    };
+  });
+
+  // Transform shared expenses where user owes money
+  const sharedOwedExpenses: UnifiedExpense[] = (sharedOwedResult.data || []).map((split) => {
+    // Handle the nested shared_expense object
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const seRaw = split.shared_expense as any;
+    // Payer may be returned as array or single object
+    const payerData = Array.isArray(seRaw.payer) ? seRaw.payer[0] : seRaw.payer;
+    const payerName = payerData?.full_name || 'Unknown';
+
+    return {
+      type: 'shared' as const,
+      id: seRaw.id,
+      amount: split.amount,  // What user owes
+      original_amount: seRaw.amount,
+      description: seRaw.description,
+      date: seRaw.date,
+      category_id: null,
+      split_method: seRaw.split_method as SplitMethod,
+      participants: [{
+        name: payerName,
+        amount: split.amount,
+        settled: split.is_settled,
+        profile_id: seRaw.paid_by,
+      }],
+      shared_expense: seRaw as unknown as SharedExpense,
+      // Indicate user owes money
+      userRole: 'debtor' as const,
+      splitId: split.id,  // Need this for settlement
+      isSettled: split.is_settled,
+      owedTo: payerName,
     };
   });
 
   // Combine and sort
-  let allExpenses = [...regularExpenses, ...sharedExpenses];
+  let allExpenses = [...regularExpenses, ...sharedPayerExpenses, ...sharedOwedExpenses];
 
   // Apply amount filters (after combining)
   if (filters?.minAmount !== undefined && filters.minAmount > 0) {
@@ -871,6 +933,55 @@ export async function deleteInlineSharedExpense(id: string) {
 
   if (dbError) {
     return { error: dbError.message };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/expenses');
+  return { success: true };
+}
+
+// ============================================
+// SETTLE EXPENSE SPLIT
+// ============================================
+
+export async function settleExpenseSplit(splitId: string) {
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
+  }
+
+  // Get the split to verify ownership
+  const { data: split, error: splitError } = await supabase
+    .from('expense_splits')
+    .select('id, user_id, is_settled, shared_expense:shared_expenses!inner(paid_by)')
+    .eq('id', splitId)
+    .single();
+
+  if (splitError || !split) {
+    return { error: 'Split not found' };
+  }
+
+  // User can only settle their own split (where they owe money)
+  if (split.user_id !== user.id) {
+    return { error: 'You can only settle your own debts' };
+  }
+
+  // Can't settle if already settled
+  if (split.is_settled) {
+    return { error: 'This split is already settled' };
+  }
+
+  // Update the split
+  const { error: updateError } = await supabase
+    .from('expense_splits')
+    .update({
+      is_settled: true,
+      settled_at: new Date().toISOString(),
+    })
+    .eq('id', splitId);
+
+  if (updateError) {
+    return { error: updateError.message };
   }
 
   revalidatePath('/dashboard');
