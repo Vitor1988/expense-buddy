@@ -3,10 +3,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import { Plus, Receipt, ChevronLeft, ChevronRight } from 'lucide-react';
-import { ExpenseCard } from '@/components/expenses/expense-card';
+import { UnifiedExpenseCard } from '@/components/expenses/unified-expense-card';
 import { ExpenseFilters } from '@/components/expenses/expense-filters';
 import { getCategories, createDefaultCategories } from '@/app/actions/categories';
-import { getExpensesPaginated } from '@/app/actions/expenses';
+import { getUnifiedExpenses } from '@/app/actions/expenses';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -50,8 +50,8 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
   // Get current page from params
   const currentPage = params?.page ? parseInt(params.page, 10) : 1;
 
-  // Fetch paginated expenses with all filters
-  const { data: expenses, total = 0, totalPages = 1 } = await getExpensesPaginated({
+  // Fetch paginated unified expenses (regular + shared) with all filters
+  const { data: expenses, total = 0, totalPages = 1 } = await getUnifiedExpenses({
     search: params?.search,
     categoryId: params?.category,
     startDate: params?.startDate,
@@ -131,21 +131,13 @@ export default async function ExpensesPage({ searchParams }: ExpensesPageProps) 
       {/* Expenses List */}
       {expenses && expenses.length > 0 ? (
         <div className="space-y-3">
-          {expenses.map((expense) => {
-            const category = expense.category as unknown as {
-              id: string;
-              name: string;
-              color: string;
-              icon: string;
-            } | null;
-            return (
-              <ExpenseCard
-                key={expense.id}
-                expense={{ ...expense, category }}
-                currency={currency}
-              />
-            );
-          })}
+          {expenses.map((expense) => (
+            <UnifiedExpenseCard
+              key={`${expense.type}-${expense.id}`}
+              expense={expense}
+              currency={currency}
+            />
+          ))}
         </div>
       ) : (
         <Card>
