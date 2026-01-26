@@ -96,7 +96,7 @@ export interface GroupInvitation {
 
 export interface SharedExpense {
   id: string;
-  group_id: string;
+  group_id: string | null;  // null for inline/ad-hoc splits
   paid_by: string;
   amount: number;
   description: string | null;
@@ -237,4 +237,61 @@ export interface MonthlyExpenseData {
   expenseCount: number;
   expenses: Expense[];
   categoryBreakdown: CategoryBreakdown[];
+}
+
+// ============================================
+// Contacts (for inline splits)
+// ============================================
+
+export type ContactSource = 'manual' | 'group_member';
+
+export interface Contact {
+  id: string;
+  user_id: string;
+  name: string;
+  email: string | null;
+  profile_id: string | null;
+  source: ContactSource;
+  source_group_id: string | null;
+  created_at: string;
+  profile?: Profile;  // populated when profile_id is set
+  group?: ExpenseGroup;  // populated when source_group_id is set
+}
+
+// ============================================
+// Unified Expenses (for combined listing)
+// ============================================
+
+export type UnifiedExpenseType = 'expense' | 'shared';
+
+export interface SplitParticipant {
+  name: string;
+  amount: number;
+  settled: boolean;
+  profile_id?: string;
+}
+
+export interface UnifiedExpense {
+  type: UnifiedExpenseType;
+  id: string;
+  amount: number;           // For shared: user's share (Via A)
+  original_amount?: number; // For shared: total amount
+  description: string | null;
+  date: string;
+  category_id: string | null;
+  category?: Category;
+  // Only for shared expenses
+  split_method?: SplitMethod;
+  participants?: SplitParticipant[];
+  // Original data
+  expense?: Expense;
+  shared_expense?: SharedExpense;
+}
+
+// Form data for creating inline shared expense
+export interface InlineSplitData {
+  enabled: boolean;
+  participants: string[];  // contact IDs
+  split_method: SplitMethod;
+  split_values?: Record<string, number>;  // for exact/percentage/shares
 }

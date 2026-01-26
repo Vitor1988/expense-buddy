@@ -4,7 +4,8 @@ import { getAuthenticatedUser } from '@/lib/auth-helpers';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { formatMonthYear, getMonthDateRange, getPastMonthKeys } from '@/lib/utils';
-import type { MonthlyExpenseData, CategoryBreakdown, Expense } from '@/types';
+import type { MonthlyExpenseData, CategoryBreakdown, Expense, UnifiedExpense, SplitMethod } from '@/types';
+import { calculateSplits, type SplitInput } from '@/lib/split-calculator';
 
 export async function createExpense(formData: FormData) {
   const { user, supabase, error } = await getAuthenticatedUser();
@@ -434,4 +435,333 @@ export async function loadMoreMonths(offset: number, count: number = 3): Promise
   });
 
   return { data: monthlyData, error: null };
+}
+
+// ============================================
+// UNIFIED EXPENSES (regular + inline shared)
+// ============================================
+
+export async function getUnifiedExpenses(filters?: {
+  startDate?: string;
+  endDate?: string;
+  categoryId?: string;
+  search?: string;
+  minAmount?: number;
+  maxAmount?: number;
+  sort?: string;
+  page?: number;
+  limit?: number;
+}): Promise<{
+  data: UnifiedExpense[] | null;
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+  error?: string;
+}> {
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { data: null, total: 0, page: 1, limit: 20, totalPages: 0, error: error || 'Not authenticated' };
+  }
+
+  const page = filters?.page || 1;
+  const limit = filters?.limit || 20;
+  const sortConfig = SORT_OPTIONS[filters?.sort || 'date_desc'] || SORT_OPTIONS.date_desc;
+
+  // Build regular expenses query
+  let expensesQuery = supabase
+    .from('expenses')
+    .select('*, category:categories(*)')
+    .eq('user_id', user.id);
+
+  // Build inline shared expenses query (where group_id is null and user is payer)
+  let sharedQuery = supabase
+    .from('shared_expenses')
+    .select(`
+      *,
+      splits:expense_splits(
+        id,
+        user_id,
+        amount,
+        is_settled,
+        profile:profiles(id, full_name)
+      )
+    `)
+    .is('group_id', null)
+    .eq('paid_by', user.id);
+
+  // Apply date filters
+  if (filters?.startDate) {
+    expensesQuery = expensesQuery.gte('date', filters.startDate);
+    sharedQuery = sharedQuery.gte('date', filters.startDate);
+  }
+  if (filters?.endDate) {
+    expensesQuery = expensesQuery.lte('date', filters.endDate);
+    sharedQuery = sharedQuery.lte('date', filters.endDate);
+  }
+
+  // Apply category filter (only to regular expenses)
+  if (filters?.categoryId) {
+    expensesQuery = expensesQuery.eq('category_id', filters.categoryId);
+  }
+
+  // Apply search filter
+  if (filters?.search) {
+    expensesQuery = expensesQuery.ilike('description', `%${filters.search}%`);
+    sharedQuery = sharedQuery.ilike('description', `%${filters.search}%`);
+  }
+
+  // Execute both queries in parallel
+  const [expensesResult, sharedResult] = await Promise.all([
+    expensesQuery,
+    sharedQuery,
+  ]);
+
+  if (expensesResult.error) {
+    return { data: null, total: 0, page, limit, totalPages: 0, error: expensesResult.error.message };
+  }
+
+  // Transform regular expenses to unified format
+  const regularExpenses: UnifiedExpense[] = (expensesResult.data || []).map((exp) => ({
+    type: 'expense' as const,
+    id: exp.id,
+    amount: exp.amount,
+    description: exp.description,
+    date: exp.date,
+    category_id: exp.category_id,
+    category: exp.category,
+    expense: exp,
+  }));
+
+  // Transform shared expenses to unified format
+  const sharedExpenses: UnifiedExpense[] = (sharedResult.data || []).map((se) => {
+    // Find user's own split to get their share
+    const userSplit = se.splits?.find((s: { user_id: string }) => s.user_id === user.id);
+    const otherSplits = se.splits?.filter((s: { user_id: string }) => s.user_id !== user.id) || [];
+
+    return {
+      type: 'shared' as const,
+      id: se.id,
+      amount: userSplit?.amount || se.amount,  // User's share (Via A)
+      original_amount: se.amount,
+      description: se.description,
+      date: se.date,
+      category_id: null,
+      split_method: se.split_method,
+      participants: otherSplits.map((s: { profile: { full_name: string | null } | null; amount: number; is_settled: boolean }) => ({
+        name: s.profile?.full_name || 'Unknown',
+        amount: s.amount,
+        settled: s.is_settled,
+      })),
+      shared_expense: se,
+    };
+  });
+
+  // Combine and sort
+  let allExpenses = [...regularExpenses, ...sharedExpenses];
+
+  // Apply amount filters (after combining)
+  if (filters?.minAmount !== undefined && filters.minAmount > 0) {
+    allExpenses = allExpenses.filter(e => e.amount >= filters.minAmount!);
+  }
+  if (filters?.maxAmount !== undefined && filters.maxAmount > 0) {
+    allExpenses = allExpenses.filter(e => e.amount <= filters.maxAmount!);
+  }
+
+  // Sort combined results
+  allExpenses.sort((a, b) => {
+    if (sortConfig.column === 'date') {
+      return sortConfig.ascending
+        ? a.date.localeCompare(b.date)
+        : b.date.localeCompare(a.date);
+    } else if (sortConfig.column === 'amount') {
+      return sortConfig.ascending
+        ? a.amount - b.amount
+        : b.amount - a.amount;
+    }
+    return 0;
+  });
+
+  const total = allExpenses.length;
+  const totalPages = Math.ceil(total / limit);
+
+  // Apply pagination
+  const offset = (page - 1) * limit;
+  const paginatedExpenses = allExpenses.slice(offset, offset + limit);
+
+  return {
+    data: paginatedExpenses,
+    total,
+    page,
+    limit,
+    totalPages,
+  };
+}
+
+// ============================================
+// CREATE INLINE SHARED EXPENSE
+// ============================================
+
+export async function createInlineSharedExpense(formData: FormData) {
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
+  }
+
+  const amount = parseFloat(formData.get('amount') as string);
+  const description = formData.get('description') as string;
+  const date = formData.get('date') as string;
+  const notes = formData.get('notes') as string;
+  const receipt_url = formData.get('receipt_url') as string;
+  const split_method = (formData.get('split_method') as SplitMethod) || 'equal';
+
+  // Parse participants (contact IDs)
+  const participantsJson = formData.get('participants') as string;
+  const participantIds: string[] = participantsJson ? JSON.parse(participantsJson) : [];
+
+  // Parse split values (for exact/percentage/shares methods)
+  const splitValuesJson = formData.get('split_values') as string;
+  const splitValues: Record<string, number> = splitValuesJson ? JSON.parse(splitValuesJson) : {};
+
+  if (!amount || isNaN(amount) || amount <= 0) {
+    return { error: 'Please enter a valid amount' };
+  }
+
+  if (participantIds.length === 0) {
+    return { error: 'Please select at least one person to split with' };
+  }
+
+  // Get contacts to resolve profile_ids
+  const { data: contacts } = await supabase
+    .from('contacts')
+    .select('id, name, profile_id')
+    .in('id', participantIds);
+
+  if (!contacts || contacts.length === 0) {
+    return { error: 'Selected contacts not found' };
+  }
+
+  // Build split participants (including current user)
+  const allParticipantIds = [
+    user.id,
+    ...contacts.map(c => c.profile_id || c.id),
+  ];
+
+  // Calculate splits
+  let splitInputs: SplitInput[] | undefined;
+
+  if (split_method !== 'equal') {
+    splitInputs = [
+      { userId: user.id, value: splitValues['self'] || 0 },
+      ...contacts.map(c => ({
+        userId: c.profile_id || c.id,
+        value: splitValues[c.id] || 0,
+      })),
+    ];
+  }
+
+  const splitResult = calculateSplits(
+    split_method,
+    amount,
+    allParticipantIds,
+    splitInputs
+  );
+
+  if (splitResult.error) {
+    return { error: splitResult.error };
+  }
+
+  // Create shared expense (with group_id = null for inline)
+  const { data: sharedExpense, error: expenseError } = await supabase
+    .from('shared_expenses')
+    .insert({
+      group_id: null,  // Inline split - no group
+      paid_by: user.id,
+      amount,
+      description: description || null,
+      date: date || new Date().toISOString().split('T')[0],
+      split_method,
+      notes: notes || null,
+      receipt_url: receipt_url || null,
+    })
+    .select()
+    .single();
+
+  if (expenseError) {
+    return { error: expenseError.message };
+  }
+
+  // Create expense splits
+  const splitsToInsert = splitResult.splits.map(split => ({
+    shared_expense_id: sharedExpense.id,
+    user_id: split.userId,
+    amount: split.amount,
+    shares: split.shares,
+    percentage: split.percentage,
+    is_settled: split.userId === user.id,  // Payer's split is already "settled"
+  }));
+
+  const { error: splitsError } = await supabase
+    .from('expense_splits')
+    .insert(splitsToInsert);
+
+  if (splitsError) {
+    // Rollback shared expense
+    await supabase.from('shared_expenses').delete().eq('id', sharedExpense.id);
+    return { error: splitsError.message };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/expenses');
+  redirect('/expenses');
+}
+
+// ============================================
+// DELETE INLINE SHARED EXPENSE
+// ============================================
+
+export async function deleteInlineSharedExpense(id: string) {
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
+  }
+
+  // Verify ownership and that it's an inline expense (no group)
+  const { data: expense } = await supabase
+    .from('shared_expenses')
+    .select('id, paid_by, group_id')
+    .eq('id', id)
+    .single();
+
+  if (!expense) {
+    return { error: 'Expense not found' };
+  }
+
+  if (expense.paid_by !== user.id) {
+    return { error: 'You can only delete your own expenses' };
+  }
+
+  if (expense.group_id !== null) {
+    return { error: 'This expense belongs to a group. Delete it from the group page.' };
+  }
+
+  // Delete splits first (cascade should handle this, but being explicit)
+  await supabase
+    .from('expense_splits')
+    .delete()
+    .eq('shared_expense_id', id);
+
+  // Delete the shared expense
+  const { error: dbError } = await supabase
+    .from('shared_expenses')
+    .delete()
+    .eq('id', id);
+
+  if (dbError) {
+    return { error: dbError.message };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/expenses');
+  return { success: true };
 }

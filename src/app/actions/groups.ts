@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { ExpenseGroup, GroupMember, SharedExpense, ExpenseSplit, GroupBalance, SplitMethod } from '@/types';
 import { calculateSplits, type SplitInput } from '@/lib/split-calculator';
+import { syncContactsForGroupMember } from './contacts';
 
 // ============ GROUP CRUD ============
 
@@ -1033,8 +1034,12 @@ export async function acceptInvitation(token: string) {
     .update({ status: 'accepted' })
     .eq('id', invitation.id);
 
+  // Sync contacts - create contacts between new member and existing members
+  await syncContactsForGroupMember(invitation.group_id, user.id);
+
   revalidatePath('/groups');
   revalidatePath(`/groups/${invitation.group_id}`);
+  revalidatePath('/expenses');
   return { success: true, groupId: invitation.group_id };
 }
 

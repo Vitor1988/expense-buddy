@@ -41,6 +41,8 @@ export interface CurrencyInputProps {
   className?: string;
   /** Whether the input is disabled */
   disabled?: boolean;
+  /** Callback when value changes */
+  onChange?: (value: number) => void;
 }
 
 export function CurrencyInput({
@@ -52,8 +54,16 @@ export function CurrencyInput({
   placeholder = '0.00',
   className = '',
   disabled = false,
+  onChange,
 }: CurrencyInputProps) {
   const symbol = getCurrencySymbol(currency);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (onChange) {
+      const value = parseFloat(e.target.value) || 0;
+      onChange(value);
+    }
+  };
 
   return (
     <div className={`space-y-2 ${className}`}>
@@ -77,6 +87,7 @@ export function CurrencyInput({
           className="pl-8"
           required={required}
           disabled={disabled}
+          onChange={handleChange}
         />
       </div>
     </div>
