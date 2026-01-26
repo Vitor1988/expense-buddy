@@ -1589,9 +1589,12 @@ export async function getSimplifiedDebts(groupId: string) {
     balanceMap.set(expense.paid_by, currentPayerBalance + expense.amount);
 
     // Each split participant owes
-    expense.splits?.forEach((split: { user_id: string; amount: number }) => {
-      const currentBalance = balanceMap.get(split.user_id) || 0;
-      balanceMap.set(split.user_id, currentBalance - split.amount);
+    expense.splits?.forEach((split: { user_id: string | null; amount: number }) => {
+      // Skip splits without user_id (manual contacts in inline splits - not used in groups)
+      if (split.user_id) {
+        const currentBalance = balanceMap.get(split.user_id) || 0;
+        balanceMap.set(split.user_id, currentBalance - split.amount);
+      }
     });
   });
 

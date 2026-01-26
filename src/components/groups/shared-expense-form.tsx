@@ -55,7 +55,8 @@ export function SharedExpenseForm({
   const [splitMethod, setSplitMethod] = useState<SplitMethod>(expense?.split_method || 'equal');
   const [selectedMembers, setSelectedMembers] = useState<string[]>(() => {
     if (expense?.splits && expense.splits.length > 0) {
-      return expense.splits.map((s) => s.user_id);
+      // Filter out splits without user_id (manual contacts in inline splits)
+      return expense.splits.map((s) => s.user_id).filter((id): id is string => id !== null);
     }
     return members.map((m) => m.user_id);
   });
@@ -65,7 +66,9 @@ export function SharedExpenseForm({
     const initial = Object.fromEntries(members.map((m) => [m.user_id, '']));
     if (expense?.split_method === 'exact' && expense.splits) {
       expense.splits.forEach((split) => {
-        initial[split.user_id] = split.amount.toString();
+        if (split.user_id) {
+          initial[split.user_id] = split.amount.toString();
+        }
       });
     }
     return initial;
@@ -76,7 +79,7 @@ export function SharedExpenseForm({
     const initial = Object.fromEntries(members.map((m) => [m.user_id, '']));
     if (expense?.split_method === 'percentage' && expense.splits) {
       expense.splits.forEach((split) => {
-        if (split.percentage !== null) {
+        if (split.percentage !== null && split.user_id) {
           initial[split.user_id] = split.percentage.toString();
         }
       });
@@ -89,7 +92,7 @@ export function SharedExpenseForm({
     const initial = Object.fromEntries(members.map((m) => [m.user_id, '1']));
     if (expense?.split_method === 'shares' && expense.splits) {
       expense.splits.forEach((split) => {
-        if (split.shares !== null) {
+        if (split.shares !== null && split.user_id) {
           initial[split.user_id] = split.shares.toString();
         }
       });

@@ -642,19 +642,23 @@ export async function createInlineSharedExpense(formData: FormData) {
   }
 
   // Build split participants (including current user)
+  // Use 'self' for current user and contact IDs for contacts
   const allParticipantIds = [
-    user.id,
-    ...contacts.map(c => c.profile_id || c.id),
+    'self',
+    ...contacts.map(c => c.id),  // Use contact IDs as participant IDs
   ];
+
+  // Map contact ID to contact data for later lookup
+  const contactMap = new Map(contacts.map(c => [c.id, c]));
 
   // Calculate splits
   let splitInputs: SplitInput[] | undefined;
 
   if (split_method !== 'equal') {
     splitInputs = [
-      { userId: user.id, value: splitValues['self'] || 0 },
+      { userId: 'self', value: splitValues['self'] || 0 },
       ...contacts.map(c => ({
-        userId: c.profile_id || c.id,
+        userId: c.id,
         value: splitValues[c.id] || 0,
       })),
     ];
@@ -692,14 +696,47 @@ export async function createInlineSharedExpense(formData: FormData) {
   }
 
   // Create expense splits
-  const splitsToInsert = splitResult.splits.map(split => ({
-    shared_expense_id: sharedExpense.id,
-    user_id: split.userId,
-    amount: split.amount,
-    shares: split.shares,
-    percentage: split.percentage,
-    is_settled: split.userId === user.id,  // Payer's split is already "settled"
-  }));
+  // Map participant IDs back to user_id or contact_id
+  const splitsToInsert = splitResult.splits.map(split => {
+    if (split.userId === 'self') {
+      // Current user - use user_id
+      return {
+        shared_expense_id: sharedExpense.id,
+        user_id: user.id,
+        contact_id: null,
+        amount: split.amount,
+        shares: split.shares,
+        percentage: split.percentage,
+        is_settled: true,  // Payer's split is already "settled"
+      };
+    } else {
+      // Contact - check if they have a profile_id
+      const contact = contactMap.get(split.userId);
+      if (contact?.profile_id) {
+        // Contact with profile - use user_id
+        return {
+          shared_expense_id: sharedExpense.id,
+          user_id: contact.profile_id,
+          contact_id: contact.id,  // Also store contact_id for reference
+          amount: split.amount,
+          shares: split.shares,
+          percentage: split.percentage,
+          is_settled: false,
+        };
+      } else {
+        // Manual contact without profile - use contact_id only
+        return {
+          shared_expense_id: sharedExpense.id,
+          user_id: null,
+          contact_id: contact?.id || split.userId,
+          amount: split.amount,
+          shares: split.shares,
+          percentage: split.percentage,
+          is_settled: false,
+        };
+      }
+    }
+  });
 
   const { error: splitsError } = await supabase
     .from('expense_splits')

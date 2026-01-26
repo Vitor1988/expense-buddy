@@ -114,13 +114,15 @@ export interface SharedExpense {
 export interface ExpenseSplit {
   id: string;
   shared_expense_id: string;
-  user_id: string;
+  user_id: string | null;  // null when using contact_id for manual contacts
+  contact_id: string | null;  // for manual contacts without profile
   amount: number;
   shares: number | null;
   percentage: number | null;
   is_settled: boolean;
   settled_at: string | null;
   profile?: Profile;
+  contact?: Contact;
 }
 
 export interface Settlement {
