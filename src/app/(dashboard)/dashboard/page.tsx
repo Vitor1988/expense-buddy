@@ -36,15 +36,25 @@ export default async function DashboardPage() {
     { data: budgets },
     { data: monthlyData },
     { data: groups },
+    { data: sharedSplits },
   ] = await Promise.all([
     supabase.from('profiles').select('currency').eq('id', user?.id).single(),
     supabase.from('expenses').select('amount').eq('user_id', user?.id).gte('date', startOfMonthStr),
     supabase.from('budgets').select('amount').eq('user_id', user?.id).eq('period', 'monthly'),
     getExpensesByMonth(3),
     getGroups(),
+    // Get user's share from inline shared expenses (group_id is null) this month
+    supabase
+      .from('expense_splits')
+      .select('amount, shared_expense:shared_expenses!inner(date, group_id)')
+      .eq('user_id', user?.id)
+      .is('shared_expense.group_id', null)
+      .gte('shared_expense.date', startOfMonthStr),
   ]);
 
-  const totalSpent = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+  const regularTotal = expenses?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
+  const sharedTotal = sharedSplits?.reduce((sum, s) => sum + Number(s.amount), 0) || 0;
+  const totalSpent = regularTotal + sharedTotal;
   const totalBudget = budgets?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
 
   const currency = (profile?.currency || 'USD') as CurrencyCode;

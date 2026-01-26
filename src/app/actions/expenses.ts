@@ -482,9 +482,11 @@ export async function getUnifiedExpenses(filters?: {
       splits:expense_splits(
         id,
         user_id,
+        contact_id,
         amount,
         is_settled,
-        profile:profiles(id, full_name)
+        profile:profiles(id, full_name),
+        contact:contacts(id, name)
       )
     `)
     .is('group_id', null)
@@ -536,8 +538,9 @@ export async function getUnifiedExpenses(filters?: {
   // Transform shared expenses to unified format
   const sharedExpenses: UnifiedExpense[] = (sharedResult.data || []).map((se) => {
     // Find user's own split to get their share
-    const userSplit = se.splits?.find((s: { user_id: string }) => s.user_id === user.id);
-    const otherSplits = se.splits?.filter((s: { user_id: string }) => s.user_id !== user.id) || [];
+    const userSplit = se.splits?.find((s: { user_id: string | null }) => s.user_id === user.id);
+    // Other splits are those not belonging to the current user (either by user_id or by contact_id)
+    const otherSplits = se.splits?.filter((s: { user_id: string | null }) => s.user_id !== user.id) || [];
 
     return {
       type: 'shared' as const,
@@ -548,8 +551,14 @@ export async function getUnifiedExpenses(filters?: {
       date: se.date,
       category_id: null,
       split_method: se.split_method,
-      participants: otherSplits.map((s: { profile: { full_name: string | null } | null; amount: number; is_settled: boolean }) => ({
-        name: s.profile?.full_name || 'Unknown',
+      participants: otherSplits.map((s: {
+        profile: { full_name: string | null } | null;
+        contact: { name: string } | null;
+        amount: number;
+        is_settled: boolean;
+      }) => ({
+        // Use contact name (for manual contacts) or profile name (for linked users)
+        name: s.contact?.name || s.profile?.full_name || 'Unknown',
         amount: s.amount,
         settled: s.is_settled,
       })),
