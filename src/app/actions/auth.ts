@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
+import { linkContactsByEmail } from './contacts';
 
 export interface AuthResult {
   error?: string;
@@ -72,6 +73,10 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
       // Continue anyway - user can create categories manually
     }
 
+    // Link any contacts that were created with this user's email before they registered
+    // This enables bidirectional visibility for shared expenses
+    await linkContactsByEmail(data.user.id, email);
+
     // Check if email confirmation is required
     // If user.identities is empty or email is not confirmed, redirect to confirmation page
     if (!data.user.email_confirmed_at) {
@@ -93,13 +98,19 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
     return { error: 'Email and password are required' };
   }
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Link any contacts that were created with this user's email before they registered
+  // This enables bidirectional visibility for shared expenses
+  if (data.user) {
+    await linkContactsByEmail(data.user.id, email);
   }
 
   revalidatePath('/', 'layout');

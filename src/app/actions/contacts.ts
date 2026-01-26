@@ -76,7 +76,7 @@ export async function createContact(formData: FormData) {
     .insert({
       user_id: user.id,
       name: name.trim(),
-      email: email?.trim() || null,
+      email: email?.trim().toLowerCase() || null,
       source: 'manual',
     })
     .select()
@@ -116,7 +116,7 @@ export async function updateContact(contactId: string, formData: FormData) {
     .from('contacts')
     .update({
       name: name.trim(),
-      email: email?.trim() || null,
+      email: email?.trim().toLowerCase() || null,
     })
     .eq('id', contactId)
     .eq('user_id', user.id);
@@ -172,6 +172,43 @@ export async function deleteContact(contactId: string) {
 
   revalidatePath('/expenses');
   return { success: true };
+}
+
+// ============================================
+// LINK CONTACTS BY EMAIL
+// (Called after login/signup to connect contacts created before user registered)
+// ============================================
+
+export async function linkContactsByEmail(userId: string, email: string) {
+  const supabase = await createClient();
+
+  // Find contacts with this email that don't have a profile_id yet
+  const { data: contacts, error: findError } = await supabase
+    .from('contacts')
+    .select('id')
+    .eq('email', email.toLowerCase())
+    .is('profile_id', null);
+
+  if (findError || !contacts?.length) {
+    return; // No contacts to link
+  }
+
+  const contactIds = contacts.map(c => c.id);
+
+  // Update contacts to link profile_id
+  await supabase
+    .from('contacts')
+    .update({ profile_id: userId })
+    .eq('email', email.toLowerCase())
+    .is('profile_id', null);
+
+  // Also update expense_splits that have these contact_ids but no user_id
+  // This makes the expenses visible to the user
+  await supabase
+    .from('expense_splits')
+    .update({ user_id: userId })
+    .in('contact_id', contactIds)
+    .is('user_id', null);
 }
 
 // ============================================
