@@ -104,14 +104,12 @@ export function ExpenseForm({ categories, expense, action, currency = 'USD' }: E
             />
           </div>
 
-          {/* Category - only for regular expenses */}
-          {(!splitData?.enabled) && (
-            <CategorySelect
-              categories={categories}
-              defaultValue={expense?.category_id}
-              label="Category"
-            />
-          )}
+          {/* Category */}
+          <CategorySelect
+            categories={categories}
+            defaultValue={expense?.category_id}
+            label="Category"
+          />
 
           {/* Date */}
           <div className="space-y-2">

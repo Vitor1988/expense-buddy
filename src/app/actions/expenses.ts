@@ -614,6 +614,7 @@ export async function createInlineSharedExpense(formData: FormData) {
   const notes = formData.get('notes') as string;
   const receipt_url = formData.get('receipt_url') as string;
   const split_method = (formData.get('split_method') as SplitMethod) || 'equal';
+  const category_id = formData.get('category_id') as string;
 
   // Parse participants (contact IDs)
   const participantsJson = formData.get('participants') as string;
@@ -629,6 +630,17 @@ export async function createInlineSharedExpense(formData: FormData) {
 
   if (participantIds.length === 0) {
     return { error: 'Please select at least one person to split with' };
+  }
+
+  // Get category name if category_id is provided
+  let categoryName: string | null = null;
+  if (category_id) {
+    const { data: category } = await supabase
+      .from('categories')
+      .select('name')
+      .eq('id', category_id)
+      .single();
+    categoryName = category?.name || null;
   }
 
   // Get contacts to resolve profile_ids
@@ -683,6 +695,7 @@ export async function createInlineSharedExpense(formData: FormData) {
       paid_by: user.id,
       amount,
       description: description || null,
+      category: categoryName,  // Store category name
       date: date || new Date().toISOString().split('T')[0],
       split_method,
       notes: notes || null,
