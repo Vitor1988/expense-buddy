@@ -270,17 +270,70 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
   const oldestMonth = monthKeys[monthKeys.length - 1];
   const { start: startDate } = getMonthDateRange(oldestMonth);
 
-  // Fetch all expenses for the date range
-  const { data: expenses, error: expensesError } = await supabase
-    .from('expenses')
-    .select('*, category:categories(*)')
-    .eq('user_id', user.id)
-    .gte('date', startDate)
-    .order('date', { ascending: false });
+  // Fetch all regular expenses for the date range
+  const [expensesResult, sharedResult] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select('*, category:categories(*)')
+      .eq('user_id', user.id)
+      .gte('date', startDate)
+      .order('date', { ascending: false }),
+    // Fetch inline shared expenses (where group_id is null)
+    supabase
+      .from('shared_expenses')
+      .select(`
+        *,
+        splits:expense_splits(
+          user_id,
+          amount,
+          contact:contacts(name)
+        )
+      `)
+      .is('group_id', null)
+      .eq('paid_by', user.id)
+      .gte('date', startDate)
+      .order('date', { ascending: false }),
+  ]);
 
-  if (expensesError) {
-    return { data: null, error: expensesError.message };
+  if (expensesResult.error) {
+    return { data: null, error: expensesResult.error.message };
   }
+
+  const expenses = expensesResult.data;
+
+  // Transform shared expenses to Expense-like format
+  const sharedAsExpenses = (sharedResult.data || []).map((se) => {
+    // Find user's own split to get their share
+    const userSplit = se.splits?.find((s: { user_id: string | null }) => s.user_id === user.id);
+    const otherSplits = se.splits?.filter((s: { user_id: string | null }) => s.user_id !== user.id) || [];
+    const participantNames = otherSplits
+      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown')
+      .join(', ');
+
+    return {
+      id: se.id,
+      user_id: user.id,
+      category_id: null,
+      amount: userSplit?.amount || se.amount,
+      description: se.description ? `${se.description} (split with ${participantNames})` : `Split with ${participantNames}`,
+      notes: se.notes,
+      date: se.date,
+      receipt_url: se.receipt_url,
+      tags: [],
+      recurring_id: null,
+      created_at: se.created_at,
+      updated_at: se.created_at,
+      // Category based on shared_expense.category field or default
+      category: se.category
+        ? { id: 'shared', name: se.category, color: '#10b981', icon: '👥', is_default: false, user_id: user.id, created_at: '' }
+        : { id: 'shared', name: 'Shared', color: '#10b981', icon: '👥', is_default: false, user_id: user.id, created_at: '' },
+    };
+  }) as Expense[];
+
+  // Combine and sort by date
+  const allExpenses = [...(expenses || []), ...sharedAsExpenses].sort(
+    (a, b) => b.date.localeCompare(a.date)
+  );
 
   // Fetch monthly budgets
   const { data: budgets } = await supabase
@@ -295,8 +348,8 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
   const monthlyData: MonthlyExpenseData[] = monthKeys.map((monthKey) => {
     const { start, end } = getMonthDateRange(monthKey);
 
-    // Filter expenses for this month
-    const monthExpenses = (expenses || []).filter((exp) => {
+    // Filter expenses for this month (including shared expenses)
+    const monthExpenses = allExpenses.filter((exp) => {
       return exp.date >= start && exp.date <= end;
     }) as Expense[];
 
