@@ -42,10 +42,13 @@ export function UnifiedExpenseCard({ expense, currency = 'USD' }: UnifiedExpense
 
   const category = expense.category;
 
-  // For payer: show participant names
-  const participantNames = isPayer
-    ? expense.participants?.filter(p => !p.settled).map(p => p.name).join(', ')
-    : null;
+  // For payer: show participant names (separated by payment status)
+  const pendingParticipants = isPayer
+    ? expense.participants?.filter(p => !p.settled) || []
+    : [];
+  const settledParticipants = isPayer
+    ? expense.participants?.filter(p => p.settled) || []
+    : [];
 
   // Handle settlement
   const handleSettle = async () => {
@@ -119,10 +122,15 @@ export function UnifiedExpenseCard({ expense, currency = 'USD' }: UnifiedExpense
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {category?.name || (isShared ? expense.shared_expense?.category : 'Uncategorized')} • {formatDate(expense.date)}
                 </p>
-                {/* Payer view: show who owes them */}
-                {isPayer && participantNames && (
+                {/* Payer view: show pending (who owes) and settled (who paid) */}
+                {isPayer && pendingParticipants.length > 0 && (
+                  <p className="text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                    Pending: {pendingParticipants.map(p => p.name).join(', ')}
+                  </p>
+                )}
+                {isPayer && settledParticipants.length > 0 && (
                   <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-0.5">
-                    Split with {participantNames}
+                    Paid: {settledParticipants.map(p => p.name).join(', ')}
                   </p>
                 )}
                 {/* Debtor view: show who they owe */}
