@@ -286,6 +286,7 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
         splits:expense_splits(
           user_id,
           amount,
+          is_settled,
           contact:contacts(name)
         )
       `)
@@ -324,6 +325,15 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
     // Find user's own split to get their share
     const userSplit = se.splits?.find((s: { user_id: string | null }) => s.user_id === user.id);
     const otherSplits = se.splits?.filter((s: { user_id: string | null }) => s.user_id !== user.id) || [];
+
+    // Separate participants by settlement status
+    const pendingParticipants = otherSplits
+      .filter((s: { is_settled: boolean }) => !s.is_settled)
+      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown');
+    const settledParticipants = otherSplits
+      .filter((s: { is_settled: boolean }) => s.is_settled)
+      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown');
+
     const participantNames = otherSplits
       .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown')
       .join(', ');
@@ -345,6 +355,10 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       category: se.category
         ? { id: 'shared', name: se.category, color: '#10b981', icon: '👥', is_default: false, user_id: user.id, created_at: '' }
         : { id: 'shared', name: 'Shared', color: '#10b981', icon: '👥', is_default: false, user_id: user.id, created_at: '' },
+      // Add settlement status for payer view
+      pendingParticipants,
+      settledParticipants,
+      isSharedPayer: true,
     };
   }) as Expense[];
 

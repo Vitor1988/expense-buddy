@@ -62,6 +62,17 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
           <p className="text-xs text-gray-500 dark:text-gray-400">
             {formatDateShort(expense.date)} {category?.name && `• ${category.name}`}
           </p>
+          {/* Payer view: show pending and paid participants */}
+          {expense.isSharedPayer && expense.pendingParticipants && expense.pendingParticipants.length > 0 && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              Pending: {expense.pendingParticipants.join(', ')}
+            </p>
+          )}
+          {expense.isSharedPayer && expense.settledParticipants && expense.settledParticipants.length > 0 && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              Paid: {expense.settledParticipants.join(', ')}
+            </p>
+          )}
         </div>
       </div>
 

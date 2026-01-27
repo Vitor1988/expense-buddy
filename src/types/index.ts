@@ -34,6 +34,10 @@ export interface Expense {
   splitId?: string;       // Split ID for settling
   isSettled?: boolean;    // Whether this debt is settled
   owedTo?: string;        // Name of person user owes money to
+  // Optional fields for payer view (inline shared expenses)
+  pendingParticipants?: string[];   // Names of participants who haven't paid yet
+  settledParticipants?: string[];   // Names of participants who have paid
+  isSharedPayer?: boolean;          // Whether user is the payer of this shared expense
 }
 
 export interface Budget {
