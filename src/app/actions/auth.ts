@@ -75,7 +75,12 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
 
     // Link any contacts that were created with this user's email before they registered
     // This enables bidirectional visibility for shared expenses
-    await linkContactsByEmail(data.user.id, email);
+    try {
+      await linkContactsByEmail(data.user.id, email);
+    } catch (e) {
+      console.error('Failed to link contacts:', e);
+      // Continue with signup - linking is not critical
+    }
 
     // Check if email confirmation is required
     // If user.identities is empty or email is not confirmed, redirect to confirmation page
@@ -110,7 +115,12 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
   // Link any contacts that were created with this user's email before they registered
   // This enables bidirectional visibility for shared expenses
   if (data.user) {
-    await linkContactsByEmail(data.user.id, email);
+    try {
+      await linkContactsByEmail(data.user.id, email);
+    } catch (e) {
+      console.error('Failed to link contacts:', e);
+      // Continue with login - linking is not critical
+    }
   }
 
   revalidatePath('/', 'layout');
