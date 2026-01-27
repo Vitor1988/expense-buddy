@@ -362,7 +362,7 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       category_id: null,
       amount: split.amount,
       description: isSettled
-        ? (se.description || 'Shared expense')
+        ? (se.description || `Paid to ${payerName}`)
         : (se.description ? `${se.description} (You owe ${payerName})` : `You owe ${payerName}`),
       notes: null,
       date: se.date,
