@@ -184,8 +184,6 @@ export async function linkContactsByEmail(userId: string, email: string) {
   // Use service client to bypass RLS - we need to update contacts owned by other users
   const supabase = createServiceClient();
 
-  console.log('[linkContactsByEmail] Starting for userId:', userId, 'email:', email.toLowerCase());
-
   // Find contacts with this email that don't have a profile_id yet
   const { data: contacts, error: findError } = await supabase
     .from('contacts')
@@ -193,44 +191,25 @@ export async function linkContactsByEmail(userId: string, email: string) {
     .eq('email', email.toLowerCase())
     .is('profile_id', null);
 
-  console.log('[linkContactsByEmail] Found contacts:', contacts, 'Error:', findError);
-
-  if (findError) {
-    console.error('[linkContactsByEmail] Error finding contacts:', findError);
-    return;
-  }
-
-  if (!contacts?.length) {
-    // Also check if there are ANY contacts with this email (even with profile_id set)
-    const { data: allContacts } = await supabase
-      .from('contacts')
-      .select('id, email, profile_id')
-      .eq('email', email.toLowerCase());
-    console.log('[linkContactsByEmail] No unlinked contacts. All contacts with this email:', allContacts);
+  if (findError || !contacts?.length) {
     return;
   }
 
   const contactIds = contacts.map(c => c.id);
-  console.log('[linkContactsByEmail] Contact IDs to update:', contactIds);
 
   // Update contacts to link profile_id
-  const { error: updateContactError } = await supabase
+  await supabase
     .from('contacts')
     .update({ profile_id: userId })
     .eq('email', email.toLowerCase())
     .is('profile_id', null);
 
-  console.log('[linkContactsByEmail] Update contacts result - Error:', updateContactError);
-
   // Also update expense_splits that have these contact_ids but no user_id
-  const { data: updatedSplits, error: updateSplitsError } = await supabase
+  await supabase
     .from('expense_splits')
     .update({ user_id: userId })
     .in('contact_id', contactIds)
-    .is('user_id', null)
-    .select();
-
-  console.log('[linkContactsByEmail] Updated splits:', updatedSplits, 'Error:', updateSplitsError);
+    .is('user_id', null);
 }
 
 // ============================================

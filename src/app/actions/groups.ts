@@ -625,8 +625,6 @@ async function calculateUserBalancesForGroups(
 ): Promise<Record<string, number>> {
   if (groupIds.length === 0) return {};
 
-  console.log('[Balance Debug] userId:', userId, 'groupIds:', groupIds);
-
   // Fetch all data in parallel with 3 queries
   const [
     { data: paidExpenses },
@@ -653,10 +651,6 @@ async function calculateUserBalancesForGroups(
       .or(`from_user_id.eq.${userId},to_user_id.eq.${userId}`),
   ]);
 
-  console.log('[Balance Debug] paidExpenses:', JSON.stringify(paidExpenses));
-  console.log('[Balance Debug] splits:', JSON.stringify(splits));
-  console.log('[Balance Debug] settlements:', JSON.stringify(settlements));
-
   // Initialize balances for all groups
   const balances: Record<string, number> = {};
   groupIds.forEach((id) => (balances[id] = 0));
@@ -682,8 +676,6 @@ async function calculateUserBalancesForGroups(
       balances[s.group_id] = (balances[s.group_id] || 0) - Number(s.amount);
     }
   });
-
-  console.log('[Balance Debug] Final balances:', JSON.stringify(balances));
 
   return balances;
 }
