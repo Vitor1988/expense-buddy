@@ -456,15 +456,21 @@ export async function acceptContactRequest(requestId: string): Promise<{ error?:
   ];
 
   // Use service client to create contacts for both users (bypasses RLS)
+  // Using upsert to handle case where one contact might already exist
   const serviceClient = createServiceClient();
 
-  const { error: contactsError } = await serviceClient
-    .from('contacts')
-    .insert(contactsToCreate);
+  for (const contactData of contactsToCreate) {
+    const { error: contactError } = await serviceClient
+      .from('contacts')
+      .upsert(contactData, {
+        onConflict: 'user_id,profile_id',
+        ignoreDuplicates: false,
+      });
 
-  if (contactsError) {
-    console.error('Failed to create contacts:', contactsError);
-    return { error: 'Failed to create contacts: ' + contactsError.message };
+    if (contactError) {
+      console.error('Failed to create contact:', contactError);
+      return { error: 'Failed to create contacts: ' + contactError.message };
+    }
   }
 
   revalidatePath('/contacts');
