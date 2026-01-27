@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
+import { createServiceClient } from '@/lib/supabase/service';
 import { type Contact } from '@/types';
 
 // ============================================
@@ -180,7 +181,8 @@ export async function deleteContact(contactId: string) {
 // ============================================
 
 export async function linkContactsByEmail(userId: string, email: string) {
-  const supabase = await createClient();
+  // Use service client to bypass RLS - we need to update contacts owned by other users
+  const supabase = createServiceClient();
 
   // Find contacts with this email that don't have a profile_id yet
   const { data: contacts, error: findError } = await supabase
