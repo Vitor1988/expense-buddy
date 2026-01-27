@@ -1,6 +1,10 @@
 'use client';
 
+import { useState } from 'react';
 import { formatDateShort, formatCurrency } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { settleExpenseSplit } from '@/app/actions/expenses';
 import type { Expense, CurrencyCode } from '@/types';
 
 interface ExpenseListItemProps {
@@ -9,10 +13,35 @@ interface ExpenseListItemProps {
 }
 
 export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
-  const category = expense.category as { name: string; color: string | null; icon: string | null } | null;
+  const category = expense.category as { id?: string; name: string; color: string | null; icon: string | null } | null;
+  const isOwed = category?.id === 'owed' && !expense.isSettled;
+  const [isSettling, setIsSettling] = useState(false);
+  const { toast } = useToast();
+
+  const handleSettle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!expense.splitId) return;
+
+    setIsSettling(true);
+    const result = await settleExpenseSplit(expense.splitId);
+    setIsSettling(false);
+
+    if (result.error) {
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Settled!',
+        description: `Payment to ${expense.owedTo || 'creditor'} marked as complete.`,
+      });
+    }
+  };
 
   return (
-    <div className="flex items-center justify-between py-3 px-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors">
+    <div className={`flex items-center justify-between py-3 px-2 hover:bg-gray-50 dark:hover:bg-gray-800/50 rounded-lg transition-colors ${isOwed ? 'border-l-2 border-l-amber-500' : ''}`}>
       <div className="flex items-center gap-3 min-w-0 flex-1">
         {/* Category Icon */}
         <div
@@ -36,10 +65,25 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
         </div>
       </div>
 
-      {/* Amount */}
-      <span className="text-sm font-semibold text-gray-900 dark:text-white ml-4 flex-shrink-0 whitespace-nowrap">
-        {formatCurrency(expense.amount, currency)}
-      </span>
+      <div className="flex items-center gap-2 ml-4 flex-shrink-0">
+        {/* Amount */}
+        <span className={`text-sm font-semibold whitespace-nowrap ${isOwed ? 'text-amber-600 dark:text-amber-400' : 'text-gray-900 dark:text-white'}`}>
+          {isOwed ? '-' : ''}{formatCurrency(expense.amount, currency)}
+        </span>
+
+        {/* Mark Paid button for owed expenses */}
+        {isOwed && expense.splitId && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleSettle}
+            disabled={isSettling}
+            className="text-xs h-7 px-2"
+          >
+            {isSettling ? '...' : 'Paid'}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

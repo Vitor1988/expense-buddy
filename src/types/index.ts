@@ -30,6 +30,10 @@ export interface Expense {
   created_at: string;
   updated_at: string;
   category?: Category;
+  // Optional fields for owed expenses (inline splits)
+  splitId?: string;       // Split ID for settling
+  isSettled?: boolean;    // Whether this debt is settled
+  owedTo?: string;        // Name of person user owes money to
 }
 
 export interface Budget {

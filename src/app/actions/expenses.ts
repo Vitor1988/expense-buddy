@@ -370,6 +370,10 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       category: se.category
         ? { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' }
         : { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' },
+      // Include split data for settling
+      splitId: split.id,
+      isSettled: split.is_settled,
+      owedTo: payerName,
     };
   }) as Expense[];
 
