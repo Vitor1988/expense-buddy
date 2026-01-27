@@ -309,6 +309,7 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       .is('shared_expense.group_id', null)
       .eq('user_id', user.id)
       .neq('shared_expense.paid_by', user.id)
+      .is('dismissed_at', null)
       .gte('shared_expense.date', startDate),
   ]);
 
@@ -1030,6 +1031,54 @@ export async function settleExpenseSplit(splitId: string) {
     .update({
       is_settled: true,
       settled_at: new Date().toISOString(),
+    })
+    .eq('id', splitId);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  revalidatePath('/dashboard');
+  revalidatePath('/expenses');
+  return { success: true };
+}
+
+// ============================================
+// DISMISS EXPENSE SPLIT (hide from debtor's view)
+// ============================================
+
+export async function dismissExpenseSplit(splitId: string) {
+  const { user, supabase, error } = await getAuthenticatedUser();
+  if (error || !user || !supabase) {
+    return { error: error || 'Not authenticated' };
+  }
+
+  // Get the split to verify ownership
+  const { data: split, error: splitError } = await supabase
+    .from('expense_splits')
+    .select('id, user_id, is_settled')
+    .eq('id', splitId)
+    .single();
+
+  if (splitError || !split) {
+    return { error: 'Split not found' };
+  }
+
+  // User can only dismiss their own split
+  if (split.user_id !== user.id) {
+    return { error: 'You can only dismiss your own expenses' };
+  }
+
+  // Can only dismiss if settled
+  if (!split.is_settled) {
+    return { error: 'You can only dismiss settled expenses' };
+  }
+
+  // Update the split with dismissed timestamp
+  const { error: updateError } = await supabase
+    .from('expense_splits')
+    .update({
+      dismissed_at: new Date().toISOString(),
     })
     .eq('id', splitId);
 

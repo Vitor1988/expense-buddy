@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+import { X } from 'lucide-react';
 import { formatDateShort, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { settleExpenseSplit } from '@/app/actions/expenses';
+import { settleExpenseSplit, dismissExpenseSplit } from '@/app/actions/expenses';
 import type { Expense, CurrencyCode } from '@/types';
 
 interface ExpenseListItemProps {
@@ -15,7 +16,9 @@ interface ExpenseListItemProps {
 export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
   const category = expense.category as { id?: string; name: string; color: string | null; icon: string | null } | null;
   const isOwed = category?.id === 'owed' && !expense.isSettled;
+  const isSettled = category?.id === 'settled' && expense.isSettled;
   const [isSettling, setIsSettling] = useState(false);
+  const [isDismissing, setIsDismissing] = useState(false);
   const { toast } = useToast();
 
   const handleSettle = async (e: React.MouseEvent) => {
@@ -36,6 +39,28 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
       toast({
         title: 'Settled!',
         description: `Payment to ${expense.owedTo || 'creditor'} marked as complete.`,
+      });
+    }
+  };
+
+  const handleDismiss = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!expense.splitId) return;
+
+    setIsDismissing(true);
+    const result = await dismissExpenseSplit(expense.splitId);
+    setIsDismissing(false);
+
+    if (result.error) {
+      toast({
+        title: 'Error',
+        description: result.error,
+        variant: 'destructive',
+      });
+    } else {
+      toast({
+        title: 'Dismissed',
+        description: 'Expense removed from your list.',
       });
     }
   };
@@ -81,6 +106,20 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
             className="text-xs h-7 px-2"
           >
             {isSettling ? '...' : 'Paid'}
+          </Button>
+        )}
+
+        {/* Dismiss button for settled expenses */}
+        {isSettled && expense.splitId && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={handleDismiss}
+            disabled={isDismissing}
+            className="h-7 w-7 p-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            title="Remove from list"
+          >
+            {isDismissing ? '...' : <X className="h-4 w-4" />}
           </Button>
         )}
       </div>
