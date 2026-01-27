@@ -309,6 +309,7 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       .is('shared_expense.group_id', null)
       .eq('user_id', user.id)
       .neq('shared_expense.paid_by', user.id)
+      .eq('is_settled', false)
       .gte('shared_expense.date', startDate),
   ]);
 
