@@ -621,7 +621,8 @@ export async function getUnifiedExpenses(filters?: {
     `)
     .is('shared_expense.group_id', null)
     .eq('user_id', user.id)
-    .neq('shared_expense.paid_by', user.id);  // Exclude expenses where user is payer
+    .neq('shared_expense.paid_by', user.id)
+    .is('dismissed_at', null);  // Exclude dismissed expenses
 
   // Apply date filters
   if (filters?.startDate) {
