@@ -259,9 +259,30 @@ export interface Contact {
   profile_id: string | null;
   source: ContactSource;
   source_group_id: string | null;
+  is_approved: boolean;
+  request_id: string | null;
   created_at: string;
   profile?: Profile;  // populated when profile_id is set
   group?: ExpenseGroup;  // populated when source_group_id is set
+}
+
+// ============================================
+// Contact Requests
+// ============================================
+
+export type ContactRequestStatus = 'pending' | 'accepted' | 'rejected' | 'cancelled';
+
+export interface ContactRequest {
+  id: string;
+  from_user_id: string;
+  to_email: string;
+  to_user_id: string | null;
+  status: ContactRequestStatus;
+  created_at: string;
+  responded_at: string | null;
+  // Populated via joins
+  from_user?: Profile;
+  to_user?: Profile;
 }
 
 // ============================================

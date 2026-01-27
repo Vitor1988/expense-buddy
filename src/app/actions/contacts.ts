@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { type Contact } from '@/types';
+import { type Contact, type ContactRequest } from '@/types';
 
 // ============================================
 // GET CONTACTS
@@ -213,6 +213,339 @@ export async function linkContactsByEmail(userId: string, email: string) {
 }
 
 // ============================================
+// CONTACT REQUESTS
+// ============================================
+
+/**
+ * Send a contact request to another user by email
+ */
+export async function sendContactRequest(email: string): Promise<{ request?: ContactRequest; error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  const normalizedEmail = email.trim().toLowerCase();
+
+  // Can't send request to yourself
+  if (normalizedEmail === user.email?.toLowerCase()) {
+    return { error: 'Cannot send contact request to yourself' };
+  }
+
+  // Check if we already have an approved contact with this email
+  const { data: existingContact } = await supabase
+    .from('contacts')
+    .select('id, is_approved')
+    .eq('user_id', user.id)
+    .eq('email', normalizedEmail)
+    .eq('is_approved', true)
+    .single();
+
+  if (existingContact) {
+    return { error: 'This person is already your contact' };
+  }
+
+  // Check if there's already a pending request
+  const { data: existingRequest } = await supabase
+    .from('contact_requests')
+    .select('id, status')
+    .eq('from_user_id', user.id)
+    .eq('to_email', normalizedEmail)
+    .eq('status', 'pending')
+    .single();
+
+  if (existingRequest) {
+    return { error: 'You already have a pending request to this person' };
+  }
+
+  // Check if the target user already exists by looking up auth users
+  const serviceClient = createServiceClient();
+  let targetUserId: string | null = null;
+
+  // Use admin API to find user by email
+  const { data: authUsers } = await serviceClient.auth.admin.listUsers();
+  const targetAuthUser = authUsers?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+  if (targetAuthUser) {
+    targetUserId = targetAuthUser.id;
+  }
+
+  // Create the request
+  const { data: request, error } = await supabase
+    .from('contact_requests')
+    .insert({
+      from_user_id: user.id,
+      to_email: normalizedEmail,
+      to_user_id: targetUserId,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    if (error.code === '23505') {
+      return { error: 'You already have a request to this person' };
+    }
+    return { error: error.message };
+  }
+
+  revalidatePath('/contacts');
+  return { request };
+}
+
+/**
+ * Get pending contact requests received by the current user
+ */
+export async function getPendingContactRequests(): Promise<{ requests: ContactRequest[]; error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { requests: [], error: 'Not authenticated' };
+  }
+
+  const { data, error } = await supabase
+    .from('contact_requests')
+    .select(`
+      *,
+      from_user:profiles!contact_requests_from_user_id_fkey(id, full_name, avatar_url)
+    `)
+    .eq('to_user_id', user.id)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { requests: [], error: error.message };
+  }
+
+  return { requests: data || [] };
+}
+
+/**
+ * Get contact requests sent by the current user
+ */
+export async function getSentContactRequests(): Promise<{ requests: ContactRequest[]; error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { requests: [], error: 'Not authenticated' };
+  }
+
+  const { data, error } = await supabase
+    .from('contact_requests')
+    .select(`
+      *,
+      to_user:profiles!contact_requests_to_user_id_fkey(id, full_name, avatar_url)
+    `)
+    .eq('from_user_id', user.id)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    return { requests: [], error: error.message };
+  }
+
+  return { requests: data || [] };
+}
+
+/**
+ * Accept a contact request - creates mutual contacts
+ */
+export async function acceptContactRequest(requestId: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  // Get the request
+  const { data: request, error: fetchError } = await supabase
+    .from('contact_requests')
+    .select('*, from_user:profiles!contact_requests_from_user_id_fkey(id, full_name)')
+    .eq('id', requestId)
+    .eq('to_user_id', user.id)
+    .eq('status', 'pending')
+    .single();
+
+  if (fetchError || !request) {
+    return { error: 'Request not found or already processed' };
+  }
+
+  // Get current user's profile
+  const { data: myProfile } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('id', user.id)
+    .single();
+
+  if (!myProfile) {
+    return { error: 'Profile not found' };
+  }
+
+  // Update request status
+  const { error: updateError } = await supabase
+    .from('contact_requests')
+    .update({
+      status: 'accepted',
+      responded_at: new Date().toISOString(),
+    })
+    .eq('id', requestId);
+
+  if (updateError) {
+    return { error: updateError.message };
+  }
+
+  const fromUserProfile = Array.isArray(request.from_user) ? request.from_user[0] : request.from_user;
+
+  // Create mutual contacts
+  const contactsToCreate = [
+    // I add the requester as my contact
+    {
+      user_id: user.id,
+      name: fromUserProfile?.full_name || 'Unknown',
+      email: request.to_email, // This is actually the email they used
+      profile_id: request.from_user_id,
+      source: 'manual' as const,
+      is_approved: true,
+      request_id: requestId,
+    },
+    // Requester gets me as their contact
+    {
+      user_id: request.from_user_id,
+      name: myProfile.full_name || 'Unknown',
+      email: user.email?.toLowerCase() || null,
+      profile_id: user.id,
+      source: 'manual' as const,
+      is_approved: true,
+      request_id: requestId,
+    },
+  ];
+
+  // Use service client for the requester's contact (bypasses RLS)
+  const serviceClient = createServiceClient();
+
+  await serviceClient
+    .from('contacts')
+    .upsert(contactsToCreate, {
+      onConflict: 'user_id,profile_id',
+      ignoreDuplicates: false,
+    });
+
+  revalidatePath('/contacts');
+  revalidatePath('/expenses');
+  return {};
+}
+
+/**
+ * Reject a contact request
+ */
+export async function rejectContactRequest(requestId: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  const { error } = await supabase
+    .from('contact_requests')
+    .update({
+      status: 'rejected',
+      responded_at: new Date().toISOString(),
+    })
+    .eq('id', requestId)
+    .eq('to_user_id', user.id)
+    .eq('status', 'pending');
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath('/contacts');
+  return {};
+}
+
+/**
+ * Cancel a sent contact request
+ */
+export async function cancelContactRequest(requestId: string): Promise<{ error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { error: 'Not authenticated' };
+  }
+
+  const { error } = await supabase
+    .from('contact_requests')
+    .update({
+      status: 'cancelled',
+      responded_at: new Date().toISOString(),
+    })
+    .eq('id', requestId)
+    .eq('from_user_id', user.id)
+    .eq('status', 'pending');
+
+  if (error) {
+    return { error: error.message };
+  }
+
+  revalidatePath('/contacts');
+  return {};
+}
+
+/**
+ * Get approved contacts only (for expense sharing)
+ */
+export async function getApprovedContacts(): Promise<{ contacts: Contact[]; error?: string }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { contacts: [], error: 'Not authenticated' };
+  }
+
+  const { data, error } = await supabase
+    .from('contacts')
+    .select(`
+      *,
+      profile:profiles!contacts_profile_id_fkey(id, full_name, avatar_url),
+      group:expense_groups!contacts_source_group_id_fkey(id, name)
+    `)
+    .eq('user_id', user.id)
+    .eq('is_approved', true)
+    .order('name', { ascending: true });
+
+  if (error) {
+    return { contacts: [], error: error.message };
+  }
+
+  return { contacts: data || [] };
+}
+
+// ============================================
 // SYNC CONTACTS FROM GROUP MEMBERSHIP
 // (Called when accepting invitation or member joins)
 // ============================================
@@ -241,13 +574,14 @@ export async function syncContactsForGroupMember(
 
   if (!newMemberProfile) return;
 
-  // Create contacts in both directions
+  // Create contacts in both directions (auto-approved since they're in the same group)
   const contactsToCreate: Array<{
     user_id: string;
     name: string;
     profile_id: string;
     source: 'group_member';
     source_group_id: string;
+    is_approved: boolean;
   }> = [];
 
   for (const member of members) {
@@ -263,6 +597,7 @@ export async function syncContactsForGroupMember(
       profile_id: profile.id,
       source: 'group_member',
       source_group_id: groupId,
+      is_approved: true,
     });
 
     // Existing member gets contact for new member
@@ -272,6 +607,7 @@ export async function syncContactsForGroupMember(
       profile_id: newMemberProfile.id,
       source: 'group_member',
       source_group_id: groupId,
+      is_approved: true,
     });
   }
 

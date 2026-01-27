@@ -822,14 +822,20 @@ export async function createInlineSharedExpense(formData: FormData) {
     categoryName = category?.name || null;
   }
 
-  // Get contacts to resolve profile_ids
+  // Get approved contacts to resolve profile_ids
   const { data: contacts } = await supabase
     .from('contacts')
-    .select('id, name, profile_id')
-    .in('id', participantIds);
+    .select('id, name, profile_id, is_approved')
+    .in('id', participantIds)
+    .eq('is_approved', true);
 
   if (!contacts || contacts.length === 0) {
-    return { error: 'Selected contacts not found' };
+    return { error: 'Selected contacts not found or not approved' };
+  }
+
+  // Ensure all selected contacts are approved
+  if (contacts.length !== participantIds.length) {
+    return { error: 'Some selected contacts are not approved. Please add them via Contacts page first.' };
   }
 
   // Build split participants (including current user)
