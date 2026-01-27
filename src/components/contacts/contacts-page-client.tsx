@@ -13,6 +13,7 @@ import {
   acceptContactRequest,
   rejectContactRequest,
   cancelContactRequest,
+  deleteContact,
 } from '@/app/actions/contacts';
 import type { Contact, ContactRequest } from '@/types';
 import { toast } from 'sonner';
@@ -78,6 +79,16 @@ export function ContactsPageClient({
       toast.error(result.error);
     } else {
       toast.success('Contact request cancelled');
+      router.refresh();
+    }
+  };
+
+  const handleDelete = async (contactId: string) => {
+    const result = await deleteContact(contactId);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success('Contact removed');
       router.refresh();
     }
   };
@@ -198,7 +209,7 @@ export function ContactsPageClient({
           {approvedContacts.length > 0 ? (
             <div className="space-y-3">
               {approvedContacts.map((contact) => (
-                <ContactCard key={contact.id} contact={contact} />
+                <ContactCard key={contact.id} contact={contact} onDelete={handleDelete} />
               ))}
             </div>
           ) : (

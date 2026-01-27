@@ -1,13 +1,27 @@
 'use client';
 
-import { User, Mail, Users } from 'lucide-react';
+import { useState } from 'react';
+import { User, Mail, Users, Trash2, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { Contact } from '@/types';
 
 interface ContactCardProps {
   contact: Contact;
+  onDelete?: (contactId: string) => Promise<void>;
 }
 
-export function ContactCard({ contact }: ContactCardProps) {
+export function ContactCard({ contact, onDelete }: ContactCardProps) {
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!onDelete) return;
+    setIsDeleting(true);
+    await onDelete(contact.id);
+    setIsDeleting(false);
+  };
+
+  const canDelete = contact.source !== 'group_member';
+
   return (
     <div className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50">
       {/* Avatar */}
@@ -42,6 +56,23 @@ export function ContactCard({ contact }: ContactCardProps) {
           <Users className="w-3 h-3" />
           {contact.group.name}
         </span>
+      )}
+
+      {/* Delete button */}
+      {canDelete && onDelete && (
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDelete}
+          disabled={isDeleting}
+          className="text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950"
+        >
+          {isDeleting ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Trash2 className="w-4 h-4" />
+          )}
+        </Button>
       )}
     </div>
   );
