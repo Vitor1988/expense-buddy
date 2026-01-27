@@ -353,13 +353,17 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
     const se = split.shared_expense;
     const payerData = Array.isArray(se.payer) ? se.payer[0] : se.payer;
     const payerName = payerData?.full_name || 'Unknown';
+    const isSettled = split.is_settled;
 
+    // If settled, show as normal expense; if not settled, show "You owe" styling
     return {
       id: se.id,
       user_id: user.id,
       category_id: null,
       amount: split.amount,
-      description: se.description ? `${se.description} (You owe ${payerName})` : `You owe ${payerName}`,
+      description: isSettled
+        ? (se.description || 'Shared expense')
+        : (se.description ? `${se.description} (You owe ${payerName})` : `You owe ${payerName}`),
       notes: null,
       date: se.date,
       receipt_url: null,
@@ -367,12 +371,14 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       recurring_id: null,
       created_at: se.date,
       updated_at: se.date,
-      category: se.category
-        ? { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' }
-        : { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' },
+      category: isSettled
+        ? { id: 'settled', name: se.category || 'Shared', color: '#10b981', icon: '✓', is_default: false, user_id: user.id, created_at: '' }
+        : (se.category
+          ? { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' }
+          : { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' }),
       // Include split data for settling
       splitId: split.id,
-      isSettled: split.is_settled,
+      isSettled: isSettled,
       owedTo: payerName,
     };
   }) as Expense[];
