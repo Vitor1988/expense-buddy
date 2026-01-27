@@ -49,6 +49,7 @@ export default async function DashboardPage() {
       .select('amount, shared_expense:shared_expenses!inner(date, group_id)')
       .eq('user_id', user?.id)
       .is('shared_expense.group_id', null)
+      .is('dismissed_at', null)
       .gte('shared_expense.date', startOfMonthStr),
   ]);
 
