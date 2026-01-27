@@ -271,14 +271,14 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
   const { start: startDate } = getMonthDateRange(oldestMonth);
 
   // Fetch all regular expenses for the date range
-  const [expensesResult, sharedResult] = await Promise.all([
+  const [expensesResult, sharedResult, owedResult] = await Promise.all([
     supabase
       .from('expenses')
       .select('*, category:categories(*)')
       .eq('user_id', user.id)
       .gte('date', startDate)
       .order('date', { ascending: false }),
-    // Fetch inline shared expenses (where group_id is null)
+    // Fetch inline shared expenses where user is payer (group_id is null)
     supabase
       .from('shared_expenses')
       .select(`
@@ -293,6 +293,23 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       .eq('paid_by', user.id)
       .gte('date', startDate)
       .order('date', { ascending: false }),
+    // Fetch inline splits where user owes money (has split but didn't pay)
+    supabase
+      .from('expense_splits')
+      .select(`
+        id,
+        user_id,
+        amount,
+        is_settled,
+        shared_expense:shared_expenses!inner(
+          id, amount, description, category, date, paid_by,
+          payer:profiles!paid_by(id, full_name)
+        )
+      `)
+      .is('shared_expense.group_id', null)
+      .eq('user_id', user.id)
+      .neq('shared_expense.paid_by', user.id)
+      .gte('shared_expense.date', startDate),
   ]);
 
   if (expensesResult.error) {
@@ -330,8 +347,34 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
     };
   }) as Expense[];
 
+  // Transform owed splits (where user owes money) to Expense-like format
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const owedAsExpenses = (owedResult.data || []).map((split: any) => {
+    const se = split.shared_expense;
+    const payerData = Array.isArray(se.payer) ? se.payer[0] : se.payer;
+    const payerName = payerData?.full_name || 'Unknown';
+
+    return {
+      id: se.id,
+      user_id: user.id,
+      category_id: null,
+      amount: split.amount,
+      description: se.description ? `${se.description} (You owe ${payerName})` : `You owe ${payerName}`,
+      notes: null,
+      date: se.date,
+      receipt_url: null,
+      tags: [],
+      recurring_id: null,
+      created_at: se.date,
+      updated_at: se.date,
+      category: se.category
+        ? { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' }
+        : { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' },
+    };
+  }) as Expense[];
+
   // Combine and sort by date
-  const allExpenses = [...(expenses || []), ...sharedAsExpenses].sort(
+  const allExpenses = [...(expenses || []), ...sharedAsExpenses, ...owedAsExpenses].sort(
     (a, b) => b.date.localeCompare(a.date)
   );
 
