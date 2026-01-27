@@ -148,7 +148,7 @@ export async function deleteContact(contactId: string) {
   // Only allow deleting manual contacts
   const { data: contact } = await supabase
     .from('contacts')
-    .select('source, profile_id')
+    .select('source, profile_id, request_id')
     .eq('id', contactId)
     .eq('user_id', user.id)
     .single();
@@ -160,6 +160,8 @@ export async function deleteContact(contactId: string) {
   if (contact.source === 'group_member') {
     return { error: 'Cannot delete contacts synced from groups. Remove from group instead.' };
   }
+
+  const serviceClient = createServiceClient();
 
   // Delete the contact
   const { error } = await supabase
@@ -174,12 +176,19 @@ export async function deleteContact(contactId: string) {
 
   // Also delete the mutual contact (the other person's contact entry for us)
   if (contact.profile_id) {
-    const serviceClient = createServiceClient();
     await serviceClient
       .from('contacts')
       .delete()
       .eq('user_id', contact.profile_id)
       .eq('profile_id', user.id);
+  }
+
+  // Delete the associated contact request (so they can send a new one)
+  if (contact.request_id) {
+    await serviceClient
+      .from('contact_requests')
+      .delete()
+      .eq('id', contact.request_id);
   }
 
   revalidatePath('/contacts');
