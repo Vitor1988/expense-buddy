@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { formatDateShort, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { SettleExpenseDialog } from '@/components/expenses/settle-expense-dialog';
+import { Check } from 'lucide-react';
 import type { Expense, CurrencyCode } from '@/types';
 
 interface ExpenseListItemProps {
@@ -14,6 +15,7 @@ interface ExpenseListItemProps {
 export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
   const category = expense.category as { id?: string; name: string; color: string | null; icon: string | null } | null;
   const isOwed = category?.id === 'owed' && !expense.isSettled;
+  const isSettledDebtor = expense.isSettled && expense.owedTo && !expense.isSharedPayer;
   const [showSettleDialog, setShowSettleDialog] = useState(false);
 
   return (
@@ -48,6 +50,13 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
             {expense.isSharedPayer && expense.settledParticipants && expense.settledParticipants.length > 0 && (
               <p className="text-xs text-emerald-600 dark:text-emerald-400">
                 Paid: {expense.settledParticipants.join(', ')}
+              </p>
+            )}
+            {/* Debtor view: show settled status */}
+            {isSettledDebtor && (
+              <p className="text-xs text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                <Check className="w-3 h-3" />
+                Settled with {expense.owedTo}
               </p>
             )}
           </div>
