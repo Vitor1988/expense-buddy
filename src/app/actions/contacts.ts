@@ -663,10 +663,16 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
     return { data: null, error: 'Not authenticated' };
   }
 
-  // Get contact details
+  // Get contact details with profile
   const { data: contact, error: contactError } = await supabase
     .from('contacts')
-    .select('id, name, profile_id')
+    .select(`
+      id,
+      name,
+      email,
+      profile_id,
+      profile:profiles!contacts_profile_id_fkey(id, full_name, avatar_url)
+    `)
     .eq('id', contactId)
     .eq('user_id', user.id)
     .single();
@@ -674,6 +680,9 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
   if (contactError || !contact) {
     return { data: null, error: 'Contact not found' };
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const profileData = contact.profile as any;
 
   // Query A: Expenses where USER paid and CONTACT is participant (contact owes user)
   const { data: userPaidExpenses } = await supabase
@@ -755,6 +764,8 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
   const userPaidSettled = userPaidList
     .filter(e => e.isSettled)
     .reduce((sum, e) => sum + e.contactShare, 0);
+  const userPaidGrandTotal = userPaidList
+    .reduce((sum, e) => sum + e.totalAmount, 0);
 
   const contactPaidTotal = contactPaidList
     .filter(e => !e.isSettled)
@@ -762,6 +773,8 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
   const contactPaidSettled = contactPaidList
     .filter(e => e.isSettled)
     .reduce((sum, e) => sum + e.userShare, 0);
+  const contactPaidGrandTotal = contactPaidList
+    .reduce((sum, e) => sum + e.totalAmount, 0);
 
   // Net balance: positive = contact owes user, negative = user owes contact
   const netBalance = userPaidTotal - contactPaidTotal;
@@ -774,12 +787,16 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
     data: {
       contactId: contact.id,
       contactName: contact.name,
+      contactEmail: contact.email,
+      contactAvatarUrl: profileData?.avatar_url || null,
       userPaidExpenses: userPaidList,
       userPaidTotal,
       userPaidSettled,
+      userPaidGrandTotal,
       contactPaidExpenses: contactPaidList,
       contactPaidTotal,
       contactPaidSettled,
+      contactPaidGrandTotal,
       netBalance,
     },
     error: null,

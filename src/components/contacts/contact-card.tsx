@@ -1,20 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { User, Mail, Users, Trash2, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { ContactBalanceDialog } from './contact-balance-dialog';
-import type { Contact, CurrencyCode } from '@/types';
+import type { Contact } from '@/types';
 
 interface ContactCardProps {
   contact: Contact;
-  currency: CurrencyCode;
   onDelete?: (contactId: string) => Promise<void>;
 }
 
-export function ContactCard({ contact, currency, onDelete }: ContactCardProps) {
+export function ContactCard({ contact, onDelete }: ContactCardProps) {
+  const router = useRouter();
   const [isDeleting, setIsDeleting] = useState(false);
-  const [showBalanceDialog, setShowBalanceDialog] = useState(false);
 
   const handleDelete = async () => {
     if (!onDelete) return;
@@ -26,10 +25,9 @@ export function ContactCard({ contact, currency, onDelete }: ContactCardProps) {
   const canDelete = contact.source !== 'group_member';
 
   return (
-    <>
     <div
       className="flex items-center gap-3 p-3 rounded-lg bg-gray-50 dark:bg-gray-800/50 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors"
-      onClick={() => setShowBalanceDialog(true)}
+      onClick={() => router.push(`/contacts/${contact.id}`)}
     >
       {/* Avatar */}
       <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center flex-shrink-0">
@@ -85,13 +83,5 @@ export function ContactCard({ contact, currency, onDelete }: ContactCardProps) {
         </Button>
       )}
     </div>
-
-    <ContactBalanceDialog
-      open={showBalanceDialog}
-      onOpenChange={setShowBalanceDialog}
-      contact={contact}
-      currency={currency}
-    />
-    </>
   );
 }

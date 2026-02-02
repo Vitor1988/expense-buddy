@@ -351,16 +351,20 @@ export interface ContactBalanceExpense {
 export interface ContactBalance {
   contactId: string;
   contactName: string;
+  contactEmail: string | null;
+  contactAvatarUrl: string | null;
 
   // Expenses created by user (contact owes user)
   userPaidExpenses: ContactBalanceExpense[];
   userPaidTotal: number;        // Total contact owes (unsettled)
   userPaidSettled: number;      // Already settled amount
+  userPaidGrandTotal: number;   // Total of all expenses user paid
 
   // Expenses created by contact (user owes contact)
   contactPaidExpenses: ContactBalanceExpense[];
   contactPaidTotal: number;     // Total user owes (unsettled)
   contactPaidSettled: number;   // Already settled amount
+  contactPaidGrandTotal: number; // Total of all expenses contact paid
 
   // Net balance (positive = contact owes user)
   netBalance: number;

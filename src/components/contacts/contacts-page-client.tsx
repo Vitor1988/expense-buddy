@@ -15,21 +15,19 @@ import {
   cancelContactRequest,
   deleteContact,
 } from '@/app/actions/contacts';
-import type { Contact, ContactRequest, CurrencyCode } from '@/types';
+import type { Contact, ContactRequest } from '@/types';
 import { toast } from 'sonner';
 
 interface ContactsPageClientProps {
   contacts: Contact[];
   pendingRequests: ContactRequest[];
   sentRequests: ContactRequest[];
-  currency: CurrencyCode;
 }
 
 export function ContactsPageClient({
   contacts,
   pendingRequests,
   sentRequests,
-  currency,
 }: ContactsPageClientProps) {
   const router = useRouter();
   const [email, setEmail] = useState('');
@@ -211,7 +209,7 @@ export function ContactsPageClient({
           {approvedContacts.length > 0 ? (
             <div className="space-y-3">
               {approvedContacts.map((contact) => (
-                <ContactCard key={contact.id} contact={contact} currency={currency} onDelete={handleDelete} />
+                <ContactCard key={contact.id} contact={contact} onDelete={handleDelete} />
               ))}
             </div>
           ) : (
