@@ -757,7 +757,17 @@ export async function getUnifiedExpenses(filters?: {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const seRaw = split.shared_expense as any;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const splitCategory = (split as any).category as { id: string; name: string; color: string | null; icon: string | null } | null;
+    const splitCategoryRaw = (split as any).category as { id: string; name: string; color: string | null; icon: string | null } | null;
+    // Convert to full Category type if present
+    const splitCategory = splitCategoryRaw ? {
+      id: splitCategoryRaw.id,
+      name: splitCategoryRaw.name,
+      color: splitCategoryRaw.color,
+      icon: splitCategoryRaw.icon,
+      user_id: user.id,
+      is_default: false,
+      created_at: '',
+    } : undefined;
     // Payer may be returned as array or single object
     const payerData = Array.isArray(seRaw.payer) ? seRaw.payer[0] : seRaw.payer;
     const payerName = payerData?.full_name || 'Unknown';
@@ -770,7 +780,7 @@ export async function getUnifiedExpenses(filters?: {
       description: seRaw.description,
       date: seRaw.date,
       category_id: split.category_id || null,
-      category: splitCategory || undefined,  // Use split's category if available
+      category: splitCategory,  // Use split's category if available
       split_method: seRaw.split_method as SplitMethod,
       participants: [{
         name: payerName,
