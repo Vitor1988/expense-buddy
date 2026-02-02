@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { formatDateShort, formatCurrency } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { SettleExpenseDialog } from '@/components/expenses/settle-expense-dialog';
-import { Check } from 'lucide-react';
+import { Check, Users } from 'lucide-react';
 import type { Expense, CurrencyCode } from '@/types';
 
 interface ExpenseListItemProps {
@@ -16,6 +16,7 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
   const category = expense.category as { id?: string; name: string; color: string | null; icon: string | null } | null;
   const isOwed = category?.id === 'owed' && !expense.isSettled;
   const isSettledDebtor = expense.isSettled && expense.owedTo && !expense.isSharedPayer;
+  const isSharedExpense = expense.isSharedPayer || isOwed || isSettledDebtor;
   const [showSettleDialog, setShowSettleDialog] = useState(false);
 
   return (
@@ -24,13 +25,20 @@ export function ExpenseListItem({ expense, currency }: ExpenseListItemProps) {
         <div className="flex items-center gap-3 min-w-0 flex-1">
           {/* Category Icon */}
           <div
-            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm"
+            className="w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 text-sm relative"
             style={{
               backgroundColor: category?.color ? `${category.color}20` : '#6b728020',
               color: category?.color || '#6b7280',
             }}
           >
             {category?.icon || '$'}
+            {isSharedExpense && (
+              <div className={`absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center ${
+                isOwed ? 'bg-amber-500' : 'bg-emerald-500'
+              }`}>
+                <Users className="w-2.5 h-2.5 text-white" />
+              </div>
+            )}
           </div>
 
           {/* Date and Description */}
