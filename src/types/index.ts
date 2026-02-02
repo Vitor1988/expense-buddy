@@ -333,3 +333,35 @@ export interface InlineSplitData {
   split_method: SplitMethod;
   split_values?: Record<string, number>;  // for exact/percentage/shares
 }
+
+// ============================================
+// Contact Balance (for contact summary view)
+// ============================================
+
+export interface ContactBalanceExpense {
+  id: string;
+  description: string | null;
+  date: string;
+  totalAmount: number;      // Total expense amount
+  userShare: number;        // User's share
+  contactShare: number;     // Contact's share
+  isSettled: boolean;
+}
+
+export interface ContactBalance {
+  contactId: string;
+  contactName: string;
+
+  // Expenses created by user (contact owes user)
+  userPaidExpenses: ContactBalanceExpense[];
+  userPaidTotal: number;        // Total contact owes (unsettled)
+  userPaidSettled: number;      // Already settled amount
+
+  // Expenses created by contact (user owes contact)
+  contactPaidExpenses: ContactBalanceExpense[];
+  contactPaidTotal: number;     // Total user owes (unsettled)
+  contactPaidSettled: number;   // Already settled amount
+
+  // Net balance (positive = contact owes user)
+  netBalance: number;
+}

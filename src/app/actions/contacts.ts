@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createServiceClient } from '@/lib/supabase/service';
-import { type Contact, type ContactRequest } from '@/types';
+import { type Contact, type ContactRequest, type ContactBalance, type ContactBalanceExpense } from '@/types';
 
 // ============================================
 // GET CONTACTS
@@ -646,4 +646,142 @@ export async function syncContactsForGroupMember(
         ignoreDuplicates: true,
       });
   }
+}
+
+// ============================================
+// GET CONTACT BALANCE
+// ============================================
+
+export async function getContactBalance(contactId: string): Promise<{ data: ContactBalance | null; error: string | null }> {
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    return { data: null, error: 'Not authenticated' };
+  }
+
+  // Get contact details
+  const { data: contact, error: contactError } = await supabase
+    .from('contacts')
+    .select('id, name, profile_id')
+    .eq('id', contactId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (contactError || !contact) {
+    return { data: null, error: 'Contact not found' };
+  }
+
+  // Query A: Expenses where USER paid and CONTACT is participant (contact owes user)
+  const { data: userPaidExpenses } = await supabase
+    .from('expense_splits')
+    .select(`
+      id,
+      amount,
+      is_settled,
+      shared_expense:shared_expenses!inner(
+        id,
+        amount,
+        description,
+        date,
+        paid_by
+      )
+    `)
+    .eq('contact_id', contactId)
+    .eq('shared_expense.paid_by', user.id)
+    .is('shared_expense.group_id', null);
+
+  // Query B: Expenses where CONTACT paid and USER is participant (user owes contact)
+  // Only works if contact has a profile_id (registered user)
+  let contactPaidExpenses: typeof userPaidExpenses = [];
+  if (contact.profile_id) {
+    const { data } = await supabase
+      .from('expense_splits')
+      .select(`
+        id,
+        amount,
+        is_settled,
+        shared_expense:shared_expenses!inner(
+          id,
+          amount,
+          description,
+          date,
+          paid_by
+        )
+      `)
+      .eq('user_id', user.id)
+      .eq('shared_expense.paid_by', contact.profile_id)
+      .is('shared_expense.group_id', null);
+    contactPaidExpenses = data || [];
+  }
+
+  // Transform user paid expenses (contact owes user)
+  const userPaidList: ContactBalanceExpense[] = (userPaidExpenses || []).map((split) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const se = split.shared_expense as any;
+    return {
+      id: se.id,
+      description: se.description,
+      date: se.date,
+      totalAmount: Number(se.amount),
+      userShare: Number(se.amount) - Number(split.amount), // User's own share
+      contactShare: Number(split.amount),
+      isSettled: split.is_settled,
+    };
+  });
+
+  // Transform contact paid expenses (user owes contact)
+  const contactPaidList: ContactBalanceExpense[] = (contactPaidExpenses || []).map((split) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const se = split.shared_expense as any;
+    return {
+      id: se.id,
+      description: se.description,
+      date: se.date,
+      totalAmount: Number(se.amount),
+      userShare: Number(split.amount),
+      contactShare: Number(se.amount) - Number(split.amount), // Contact's own share
+      isSettled: split.is_settled,
+    };
+  });
+
+  // Calculate totals
+  const userPaidTotal = userPaidList
+    .filter(e => !e.isSettled)
+    .reduce((sum, e) => sum + e.contactShare, 0);
+  const userPaidSettled = userPaidList
+    .filter(e => e.isSettled)
+    .reduce((sum, e) => sum + e.contactShare, 0);
+
+  const contactPaidTotal = contactPaidList
+    .filter(e => !e.isSettled)
+    .reduce((sum, e) => sum + e.userShare, 0);
+  const contactPaidSettled = contactPaidList
+    .filter(e => e.isSettled)
+    .reduce((sum, e) => sum + e.userShare, 0);
+
+  // Net balance: positive = contact owes user, negative = user owes contact
+  const netBalance = userPaidTotal - contactPaidTotal;
+
+  // Sort expenses by date (newest first)
+  userPaidList.sort((a, b) => b.date.localeCompare(a.date));
+  contactPaidList.sort((a, b) => b.date.localeCompare(a.date));
+
+  return {
+    data: {
+      contactId: contact.id,
+      contactName: contact.name,
+      userPaidExpenses: userPaidList,
+      userPaidTotal,
+      userPaidSettled,
+      contactPaidExpenses: contactPaidList,
+      contactPaidTotal,
+      contactPaidSettled,
+      netBalance,
+    },
+    error: null,
+  };
 }
