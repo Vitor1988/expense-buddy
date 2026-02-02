@@ -342,10 +342,10 @@ export interface ContactBalanceExpense {
   id: string;
   description: string | null;
   date: string;
-  totalAmount: number;      // Total expense amount
-  userShare: number;        // User's share
-  contactShare: number;     // Contact's share
+  totalAmount: number;       // Total expense amount
+  contactShare: number;      // Contact's share (what they owe or are owed)
   isSettled: boolean;
+  participantCount: number;  // Number of people in this expense
 }
 
 export interface ContactBalance {

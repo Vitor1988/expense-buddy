@@ -727,6 +727,28 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
     contactPaidExpenses = data || [];
   }
 
+  // Collect all shared_expense_ids to count participants
+  const allExpenseIds = new Set<string>();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (userPaidExpenses || []).forEach((s: any) => allExpenseIds.add(s.shared_expense.id));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (contactPaidExpenses || []).forEach((s: any) => allExpenseIds.add(s.shared_expense.id));
+
+  // Get participant count for each expense
+  const participantCounts = new Map<string, number>();
+  if (allExpenseIds.size > 0) {
+    const { data: allSplits } = await supabase
+      .from('expense_splits')
+      .select('shared_expense_id')
+      .in('shared_expense_id', Array.from(allExpenseIds));
+
+    // Count splits per expense
+    (allSplits || []).forEach((split) => {
+      const count = participantCounts.get(split.shared_expense_id) || 0;
+      participantCounts.set(split.shared_expense_id, count + 1);
+    });
+  }
+
   // Transform user paid expenses (contact owes user)
   const userPaidList: ContactBalanceExpense[] = (userPaidExpenses || []).map((split) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -736,13 +758,14 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
       description: se.description,
       date: se.date,
       totalAmount: Number(se.amount),
-      userShare: Number(se.amount) - Number(split.amount), // User's own share
       contactShare: Number(split.amount),
       isSettled: split.is_settled,
+      participantCount: participantCounts.get(se.id) || 1,
     };
   });
 
   // Transform contact paid expenses (user owes contact)
+  // Here split.amount is user's share (what user owes)
   const contactPaidList: ContactBalanceExpense[] = (contactPaidExpenses || []).map((split) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const se = split.shared_expense as any;
@@ -751,9 +774,9 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
       description: se.description,
       date: se.date,
       totalAmount: Number(se.amount),
-      userShare: Number(split.amount),
-      contactShare: Number(se.amount) - Number(split.amount), // Contact's own share
+      contactShare: Number(split.amount), // User's share (what user owes to contact)
       isSettled: split.is_settled,
+      participantCount: participantCounts.get(se.id) || 1,
     };
   });
 
@@ -769,10 +792,10 @@ export async function getContactBalance(contactId: string): Promise<{ data: Cont
 
   const contactPaidTotal = contactPaidList
     .filter(e => !e.isSettled)
-    .reduce((sum, e) => sum + e.userShare, 0);
+    .reduce((sum, e) => sum + e.contactShare, 0);
   const contactPaidSettled = contactPaidList
     .filter(e => e.isSettled)
-    .reduce((sum, e) => sum + e.userShare, 0);
+    .reduce((sum, e) => sum + e.contactShare, 0);
   const contactPaidGrandTotal = contactPaidList
     .reduce((sum, e) => sum + e.totalAmount, 0);
 

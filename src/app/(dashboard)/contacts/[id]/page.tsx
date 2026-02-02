@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { ArrowLeft, User, Mail, ArrowUpRight, ArrowDownLeft, Check } from 'lucide-react';
+import { ArrowLeft, User, Mail, ArrowUpRight, ArrowDownLeft, Check, Users } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { getContactBalance } from '@/app/actions/contacts';
 import { getProfile } from '@/app/actions/settings';
@@ -182,8 +182,14 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
                     </p>
                   </div>
                   <div className="text-right ml-4">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center justify-end gap-1">
                       Total: {formatter.format(expense.totalAmount)}
+                      {expense.participantCount > 2 && (
+                        <span className="text-xs text-gray-400 flex items-center gap-0.5 ml-1">
+                          <Users className="w-3 h-3" />
+                          +{expense.participantCount - 2}
+                        </span>
+                      )}
                     </p>
                     <p
                       className={`font-semibold flex items-center justify-end gap-1 ${
@@ -233,8 +239,14 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
                     </p>
                   </div>
                   <div className="text-right ml-4">
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 flex items-center justify-end gap-1">
                       Total: {formatter.format(expense.totalAmount)}
+                      {expense.participantCount > 2 && (
+                        <span className="text-xs text-gray-400 flex items-center gap-0.5 ml-1">
+                          <Users className="w-3 h-3" />
+                          +{expense.participantCount - 2}
+                        </span>
+                      )}
                     </p>
                     <p
                       className={`font-semibold flex items-center justify-end gap-1 ${
@@ -243,7 +255,7 @@ export default async function ContactDetailPage({ params }: ContactDetailPagePro
                           : 'text-amber-600 dark:text-amber-400'
                       }`}
                     >
-                      -{formatter.format(expense.userShare)}
+                      -{formatter.format(expense.contactShare)}
                       {expense.isSettled && <Check className="w-4 h-4" />}
                     </p>
                   </div>
