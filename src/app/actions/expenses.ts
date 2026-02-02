@@ -302,6 +302,8 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
         user_id,
         amount,
         is_settled,
+        category_id,
+        category:categories(id, name, color, icon),
         shared_expense:shared_expenses!inner(
           id, amount, description, category, date, paid_by,
           payer:profiles!paid_by(id, full_name)
@@ -370,11 +372,39 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
     const payerName = payerData?.full_name || 'Unknown';
     const isSettled = split.is_settled;
 
+    // Use split's category if settled and has one, otherwise use original category
+    const splitCategory = split.category as { id: string; name: string; color: string | null; icon: string | null } | null;
+    const hasUserCategory = isSettled && splitCategory;
+
+    // Build category object
+    let categoryObj;
+    if (hasUserCategory) {
+      // Use user's chosen category when settling
+      categoryObj = {
+        id: splitCategory.id,
+        name: splitCategory.name,
+        color: splitCategory.color || '#10b981',
+        icon: splitCategory.icon || '✓',
+        is_default: false,
+        user_id: user.id,
+        created_at: '',
+      };
+    } else if (isSettled) {
+      // Settled but no user category (legacy data)
+      categoryObj = { id: 'settled', name: se.category || 'Shared', color: '#10b981', icon: '✓', is_default: false, user_id: user.id, created_at: '' };
+    } else if (se.category) {
+      // Not settled, has original category
+      categoryObj = { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' };
+    } else {
+      // Not settled, no category
+      categoryObj = { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' };
+    }
+
     // If settled, show as normal expense; if not settled, show "You owe" styling
     return {
       id: se.id,
       user_id: user.id,
-      category_id: null,
+      category_id: split.category_id || null,
       amount: split.amount,
       description: isSettled
         ? (se.description || `Paid to ${payerName}`)
@@ -386,11 +416,7 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
       recurring_id: null,
       created_at: se.date,
       updated_at: se.date,
-      category: isSettled
-        ? { id: 'settled', name: se.category || 'Shared', color: '#10b981', icon: '✓', is_default: false, user_id: user.id, created_at: '' }
-        : (se.category
-          ? { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' }
-          : { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' }),
+      category: categoryObj,
       // Include split data for settling
       splitId: split.id,
       isSettled: isSettled,
@@ -622,6 +648,8 @@ export async function getUnifiedExpenses(filters?: {
       user_id,
       amount,
       is_settled,
+      category_id,
+      category:categories(id, name, color, icon),
       shared_expense:shared_expenses!inner(
         id,
         amount,
@@ -650,9 +678,15 @@ export async function getUnifiedExpenses(filters?: {
     sharedOwedQuery = sharedOwedQuery.lte('shared_expense.date', filters.endDate);
   }
 
-  // Apply category filter (only to regular expenses)
+  // Apply category filter
   if (filters?.categoryId) {
     expensesQuery = expensesQuery.eq('category_id', filters.categoryId);
+    // For owed expenses: only show settled splits with matching category
+    sharedOwedQuery = sharedOwedQuery
+      .eq('is_settled', true)
+      .eq('category_id', filters.categoryId);
+    // Note: sharedPayerQuery uses string category (not category_id), so we exclude them
+    // They will be filtered out in the transform step
   }
 
   // Apply search filter
@@ -722,6 +756,8 @@ export async function getUnifiedExpenses(filters?: {
     // Handle the nested shared_expense object
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const seRaw = split.shared_expense as any;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const splitCategory = (split as any).category as { id: string; name: string; color: string | null; icon: string | null } | null;
     // Payer may be returned as array or single object
     const payerData = Array.isArray(seRaw.payer) ? seRaw.payer[0] : seRaw.payer;
     const payerName = payerData?.full_name || 'Unknown';
@@ -733,7 +769,8 @@ export async function getUnifiedExpenses(filters?: {
       original_amount: seRaw.amount,
       description: seRaw.description,
       date: seRaw.date,
-      category_id: null,
+      category_id: split.category_id || null,
+      category: splitCategory || undefined,  // Use split's category if available
       split_method: seRaw.split_method as SplitMethod,
       participants: [{
         name: payerName,
@@ -751,7 +788,13 @@ export async function getUnifiedExpenses(filters?: {
   });
 
   // Combine and sort
-  let allExpenses = [...regularExpenses, ...sharedPayerExpenses, ...sharedOwedExpenses];
+  // Exclude sharedPayerExpenses when category filter is applied (they use string category, not category_id)
+  const includeSharedPayer = !filters?.categoryId;
+  let allExpenses = [
+    ...regularExpenses,
+    ...(includeSharedPayer ? sharedPayerExpenses : []),
+    ...sharedOwedExpenses
+  ];
 
   // Apply amount filters (after combining)
   if (filters?.minAmount !== undefined && filters.minAmount > 0) {
