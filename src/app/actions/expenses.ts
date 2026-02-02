@@ -627,6 +627,7 @@ export async function getUnifiedExpenses(filters?: {
     .select(`
       *,
       payer:profiles!paid_by(id, full_name),
+      category_obj:categories(id, name, icon, color),
       splits:expense_splits(
         id,
         user_id,
@@ -685,8 +686,8 @@ export async function getUnifiedExpenses(filters?: {
     sharedOwedQuery = sharedOwedQuery
       .eq('is_settled', true)
       .eq('category_id', filters.categoryId);
-    // Note: sharedPayerQuery uses string category (not category_id), so we exclude them
-    // They will be filtered out in the transform step
+    // For payer expenses: filter by category_id
+    sharedPayerQuery = sharedPayerQuery.eq('category_id', filters.categoryId);
   }
 
   // Apply search filter
@@ -725,6 +726,9 @@ export async function getUnifiedExpenses(filters?: {
     const userSplit = se.splits?.find((s: { user_id: string | null }) => s.user_id === user.id);
     // Other splits are those not belonging to the current user
     const otherSplits = se.splits?.filter((s: { user_id: string | null }) => s.user_id !== user.id) || [];
+    // Get category object from joined categories table
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const categoryObj = (se as any).category_obj as { id: string; name: string; icon: string | null; color: string | null } | null;
 
     return {
       type: 'shared' as const,
@@ -733,7 +737,16 @@ export async function getUnifiedExpenses(filters?: {
       original_amount: se.amount,
       description: se.description,
       date: se.date,
-      category_id: null,
+      category_id: categoryObj?.id || null,
+      category: categoryObj ? {
+        id: categoryObj.id,
+        name: categoryObj.name,
+        icon: categoryObj.icon,
+        color: categoryObj.color,
+        user_id: user.id,
+        is_default: false,
+        created_at: '',
+      } : undefined,
       split_method: se.split_method,
       participants: otherSplits.map((s: {
         profile: { full_name: string | null } | null;
@@ -798,11 +811,9 @@ export async function getUnifiedExpenses(filters?: {
   });
 
   // Combine and sort
-  // Exclude sharedPayerExpenses when category filter is applied (they use string category, not category_id)
-  const includeSharedPayer = !filters?.categoryId;
   let allExpenses = [
     ...regularExpenses,
-    ...(includeSharedPayer ? sharedPayerExpenses : []),
+    ...sharedPayerExpenses,
     ...sharedOwedExpenses
   ];
 
@@ -947,7 +958,8 @@ export async function createInlineSharedExpense(formData: FormData) {
       paid_by: user.id,
       amount,
       description: description || null,
-      category: categoryName,  // Store category name
+      category: categoryName,  // Store category name for backwards compatibility
+      category_id: category_id || null,  // Store category ID for filtering/display
       date: date || new Date().toISOString().split('T')[0],
       split_method,
       notes: notes || null,
