@@ -8,19 +8,38 @@ export async function getSpendingByCategory(startDate: string, endDate: string) 
     return { data: null, error: error || 'Not authenticated' };
   }
 
-  // Get all expenses in the date range
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('amount, category:categories(name, color)')
-    .eq('user_id', user.id)
-    .gte('date', startDate)
-    .lte('date', endDate);
+  // Fetch regular expenses and settled splits in parallel
+  const [expensesResult, splitsResult] = await Promise.all([
+    // Regular expenses
+    supabase
+      .from('expenses')
+      .select('amount, category:categories(name, color)')
+      .eq('user_id', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate),
+    // Settled expense splits with category
+    supabase
+      .from('expense_splits')
+      .select('amount, category:categories(name, color), shared_expense:shared_expenses!inner(date)')
+      .eq('user_id', user.id)
+      .eq('is_settled', true)
+      .not('category_id', 'is', null)
+  ]);
 
-  if (!expenses) return { data: [], error: null };
+  const expenses = expensesResult.data || [];
+
+  // Filter splits by date (can't do date filter in the join easily)
+  const settledSplits = (splitsResult.data || []).filter((split) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const sharedExpense = split.shared_expense as any;
+    const splitDate = sharedExpense?.date;
+    return splitDate && splitDate >= startDate && splitDate <= endDate;
+  });
 
   // Group by category
   const categoryTotals: Record<string, { name: string; value: number; color: string }> = {};
 
+  // Process regular expenses
   expenses.forEach((expense) => {
     const category = expense.category as unknown as { name: string; color: string } | null;
     const categoryName = category?.name || 'Uncategorized';
@@ -36,6 +55,22 @@ export async function getSpendingByCategory(startDate: string, endDate: string) 
     categoryTotals[categoryName].value += Number(expense.amount);
   });
 
+  // Process settled splits
+  settledSplits.forEach((split) => {
+    const category = split.category as unknown as { name: string; color: string } | null;
+    const categoryName = category?.name || 'Uncategorized';
+    const categoryColor = category?.color || '#6b7280';
+
+    if (!categoryTotals[categoryName]) {
+      categoryTotals[categoryName] = {
+        name: categoryName,
+        value: 0,
+        color: categoryColor,
+      };
+    }
+    categoryTotals[categoryName].value += Number(split.amount);
+  });
+
   const data = Object.values(categoryTotals).sort((a, b) => b.value - a.value);
   return { data, error: null };
 }
@@ -46,41 +81,70 @@ export async function getSpendingTrend(startDate: string, endDate: string, group
     return { data: null, error: error || 'Not authenticated' };
   }
 
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('amount, date')
-    .eq('user_id', user.id)
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: true });
+  // Fetch regular expenses and settled splits in parallel
+  const [expensesResult, splitsResult] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select('amount, date')
+      .eq('user_id', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: true }),
+    // Settled expense splits with category
+    supabase
+      .from('expense_splits')
+      .select('amount, shared_expense:shared_expenses!inner(date)')
+      .eq('user_id', user.id)
+      .eq('is_settled', true)
+      .not('category_id', 'is', null)
+  ]);
 
-  if (!expenses) return { data: [], error: null };
+  const expenses = expensesResult.data || [];
 
-  // Group by date
-  const dateTotals: Record<string, number> = {};
+  // Filter splits by date and extract date
+  const settledSplits = (splitsResult.data || [])
+    .map((split) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sharedExpense = split.shared_expense as any;
+      return { amount: split.amount, date: sharedExpense?.date };
+    })
+    .filter((split) => split.date && split.date >= startDate && split.date <= endDate);
 
-  expenses.forEach((expense) => {
-    let key: string;
-    const date = new Date(expense.date);
-
+  // Helper function to get date key
+  const getDateKey = (dateStr: string): string => {
+    const date = new Date(dateStr);
     switch (groupBy) {
       case 'week': {
         const weekStart = new Date(date);
         weekStart.setDate(date.getDate() - date.getDay());
-        key = weekStart.toISOString().split('T')[0];
-        break;
+        return weekStart.toISOString().split('T')[0];
       }
       case 'month':
-        key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-        break;
+        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       default:
-        key = expense.date;
+        return dateStr;
     }
+  };
 
+  // Group by date
+  const dateTotals: Record<string, number> = {};
+
+  // Process regular expenses
+  expenses.forEach((expense) => {
+    const key = getDateKey(expense.date);
     if (!dateTotals[key]) {
       dateTotals[key] = 0;
     }
     dateTotals[key] += Number(expense.amount);
+  });
+
+  // Process settled splits
+  settledSplits.forEach((split) => {
+    const key = getDateKey(split.date);
+    if (!dateTotals[key]) {
+      dateTotals[key] = 0;
+    }
+    dateTotals[key] += Number(split.amount);
   });
 
   const data = Object.entries(dateTotals).map(([date, amount]) => ({
@@ -102,14 +166,36 @@ export async function getMonthlyComparison(months: number = 6) {
   // Calculate date range for single query
   const startDate = new Date(now.getFullYear(), now.getMonth() - months + 1, 1);
   const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const startDateStr = startDate.toISOString().split('T')[0];
+  const endDateStr = endDate.toISOString().split('T')[0];
 
-  // Fetch all expenses in the date range with a single query
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('amount, date')
-    .eq('user_id', user.id)
-    .gte('date', startDate.toISOString().split('T')[0])
-    .lte('date', endDate.toISOString().split('T')[0]);
+  // Fetch regular expenses and settled splits in parallel
+  const [expensesResult, splitsResult] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select('amount, date')
+      .eq('user_id', user.id)
+      .gte('date', startDateStr)
+      .lte('date', endDateStr),
+    // Settled expense splits with category
+    supabase
+      .from('expense_splits')
+      .select('amount, shared_expense:shared_expenses!inner(date)')
+      .eq('user_id', user.id)
+      .eq('is_settled', true)
+      .not('category_id', 'is', null)
+  ]);
+
+  const expenses = expensesResult.data || [];
+
+  // Filter splits by date and extract date
+  const settledSplits = (splitsResult.data || [])
+    .map((split) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sharedExpense = split.shared_expense as any;
+      return { amount: split.amount, date: sharedExpense?.date };
+    })
+    .filter((split) => split.date && split.date >= startDateStr && split.date <= endDateStr);
 
   // Group expenses by month in JavaScript
   const monthlyTotals: Record<string, number> = {};
@@ -121,12 +207,21 @@ export async function getMonthlyComparison(months: number = 6) {
     monthlyTotals[key] = 0;
   }
 
-  // Sum expenses by month
-  (expenses || []).forEach((expense) => {
+  // Sum regular expenses by month
+  expenses.forEach((expense) => {
     const expenseDate = new Date(expense.date);
     const key = `${expenseDate.getFullYear()}-${String(expenseDate.getMonth() + 1).padStart(2, '0')}`;
     if (monthlyTotals[key] !== undefined) {
       monthlyTotals[key] += Number(expense.amount);
+    }
+  });
+
+  // Sum settled splits by month
+  settledSplits.forEach((split) => {
+    const splitDate = new Date(split.date);
+    const key = `${splitDate.getFullYear()}-${String(splitDate.getMonth() + 1).padStart(2, '0')}`;
+    if (monthlyTotals[key] !== undefined) {
+      monthlyTotals[key] += Number(split.amount);
     }
   });
 

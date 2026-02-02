@@ -129,8 +129,10 @@ export interface ExpenseSplit {
   percentage: number | null;
   is_settled: boolean;
   settled_at: string | null;
+  category_id: string | null;  // user's chosen category when settling
   profile?: Profile;
   contact?: Contact;
+  category?: Category;  // populated when fetched with category
 }
 
 export interface Settlement {

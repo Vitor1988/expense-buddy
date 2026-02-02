@@ -7,7 +7,8 @@ import { CardActionMenu, DeleteConfirmationDialog } from '@/components/shared';
 import { useDeleteAction } from '@/hooks/use-delete-action';
 import { useToast } from '@/hooks/use-toast';
 import { type UnifiedExpense } from '@/types';
-import { deleteExpense, deleteInlineSharedExpense, settleExpenseSplit, dismissExpenseSplit } from '@/app/actions/expenses';
+import { deleteExpense, deleteInlineSharedExpense, dismissExpenseSplit } from '@/app/actions/expenses';
+import { SettleExpenseDialog } from './settle-expense-dialog';
 import Link from 'next/link';
 import { formatDate } from '@/lib/utils';
 import { Users, AlertCircle, Check, X } from 'lucide-react';
@@ -21,7 +22,7 @@ export function UnifiedExpenseCard({ expense, currency = 'USD' }: UnifiedExpense
   const isShared = expense.type === 'shared';
   const isDebtor = expense.userRole === 'debtor';
   const isPayer = expense.userRole === 'payer';
-  const [isSettling, setIsSettling] = useState(false);
+  const [showSettleDialog, setShowSettleDialog] = useState(false);
   const [isDismissing, setIsDismissing] = useState(false);
   const { toast } = useToast();
 
@@ -49,28 +50,6 @@ export function UnifiedExpenseCard({ expense, currency = 'USD' }: UnifiedExpense
   const settledParticipants = isPayer
     ? expense.participants?.filter(p => p.settled) || []
     : [];
-
-  // Handle settlement
-  const handleSettle = async () => {
-    if (!expense.splitId) return;
-
-    setIsSettling(true);
-    const result = await settleExpenseSplit(expense.splitId);
-    setIsSettling(false);
-
-    if (result.error) {
-      toast({
-        title: 'Error',
-        description: result.error,
-        variant: 'destructive',
-      });
-    } else {
-      toast({
-        title: 'Settled!',
-        description: 'Payment marked as complete.',
-      });
-    }
-  };
 
   // Handle dismiss (hide from debtor's view)
   const handleDismiss = async () => {
@@ -176,15 +155,14 @@ export function UnifiedExpenseCard({ expense, currency = 'USD' }: UnifiedExpense
                 )}
               </div>
               {/* Show Mark as Paid button for debtors who haven't settled */}
-              {isDebtor && !expense.isSettled && (
+              {isDebtor && !expense.isSettled && expense.splitId && (
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={handleSettle}
-                  disabled={isSettling}
+                  onClick={() => setShowSettleDialog(true)}
                   className="text-xs"
                 >
-                  {isSettling ? 'Settling...' : 'Mark Paid'}
+                  Mark Paid
                 </Button>
               )}
               {/* Show menu for: deletable expenses OR settled debtors (for dismiss) */}
@@ -226,6 +204,19 @@ export function UnifiedExpenseCard({ expense, currency = 'USD' }: UnifiedExpense
             ? "Are you sure you want to delete this shared expense? This will also remove all splits. This action cannot be undone."
             : "Are you sure you want to delete this expense? This action cannot be undone."
           }
+        />
+      )}
+
+      {/* Settle dialog for debtors */}
+      {isDebtor && expense.splitId && (
+        <SettleExpenseDialog
+          open={showSettleDialog}
+          onOpenChange={setShowSettleDialog}
+          splitId={expense.splitId}
+          expenseDescription={expense.description || ''}
+          amount={expense.amount}
+          owedTo={expense.owedTo || 'Unknown'}
+          currency={currency as 'EUR' | 'USD' | 'GBP'}
         />
       )}
     </>

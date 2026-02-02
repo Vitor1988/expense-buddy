@@ -158,25 +158,61 @@ export async function getBudgetProgress() {
   const hasYearly = budgets.some(b => b.period === 'yearly');
   const earliestStart = hasYearly ? dateRanges.yearly.start : dateRanges.monthly.start;
 
-  // Fetch ALL expenses in a single query
-  const { data: allExpenses } = await supabase
-    .from('expenses')
-    .select('amount, category_id, date')
-    .eq('user_id', user.id)
-    .gte('date', earliestStart)
-    .lte('date', dateRanges.yearly.end);
+  // Fetch regular expenses and settled splits in parallel
+  const [expensesResult, splitsResult] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select('amount, category_id, date')
+      .eq('user_id', user.id)
+      .gte('date', earliestStart)
+      .lte('date', dateRanges.yearly.end),
+    // Settled expense splits with category
+    supabase
+      .from('expense_splits')
+      .select('amount, category_id, shared_expense:shared_expenses!inner(date)')
+      .eq('user_id', user.id)
+      .eq('is_settled', true)
+      .not('category_id', 'is', null)
+  ]);
+
+  const allExpenses = expensesResult.data || [];
+
+  // Process settled splits to extract date
+  const settledSplits = (splitsResult.data || [])
+    .map((split) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sharedExpense = split.shared_expense as any;
+      return {
+        amount: split.amount,
+        category_id: split.category_id,
+        date: sharedExpense?.date,
+      };
+    })
+    .filter((split) => split.date && split.date >= earliestStart && split.date <= dateRanges.yearly.end);
 
   // Process in memory to calculate spending per budget
   const budgetProgress = budgets.map((budget) => {
     const range = dateRanges[budget.period as keyof typeof dateRanges];
 
-    const spent = (allExpenses || [])
+    // Sum regular expenses
+    const expenseSpent = allExpenses
       .filter(e => {
         const inDateRange = e.date >= range.start && e.date <= range.end;
         const matchesCategory = budget.category_id ? e.category_id === budget.category_id : true;
         return inDateRange && matchesCategory;
       })
       .reduce((sum, e) => sum + Number(e.amount), 0);
+
+    // Sum settled splits
+    const splitSpent = settledSplits
+      .filter(s => {
+        const inDateRange = s.date >= range.start && s.date <= range.end;
+        const matchesCategory = budget.category_id ? s.category_id === budget.category_id : true;
+        return inDateRange && matchesCategory;
+      })
+      .reduce((sum, s) => sum + Number(s.amount), 0);
+
+    const spent = expenseSpent + splitSpent;
 
     return {
       ...budget,

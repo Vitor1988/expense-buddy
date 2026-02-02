@@ -1019,10 +1019,27 @@ export async function deleteInlineSharedExpense(id: string) {
 // SETTLE EXPENSE SPLIT
 // ============================================
 
-export async function settleExpenseSplit(splitId: string) {
+export async function settleExpenseSplit(splitId: string, categoryId: string) {
   const { user, supabase, error } = await getAuthenticatedUser();
   if (error || !user || !supabase) {
     return { error: error || 'Not authenticated' };
+  }
+
+  // Validate category is provided (required)
+  if (!categoryId) {
+    return { error: 'Category is required' };
+  }
+
+  // Validate category belongs to user
+  const { data: category, error: categoryError } = await supabase
+    .from('categories')
+    .select('id')
+    .eq('id', categoryId)
+    .eq('user_id', user.id)
+    .single();
+
+  if (categoryError || !category) {
+    return { error: 'Invalid category' };
   }
 
   // Get the split to verify ownership
@@ -1046,12 +1063,13 @@ export async function settleExpenseSplit(splitId: string) {
     return { error: 'This split is already settled' };
   }
 
-  // Update the split
+  // Update the split with category
   const { error: updateError } = await supabase
     .from('expense_splits')
     .update({
       is_settled: true,
       settled_at: new Date().toISOString(),
+      category_id: categoryId,
     })
     .eq('id', splitId);
 
@@ -1061,6 +1079,7 @@ export async function settleExpenseSplit(splitId: string) {
 
   revalidatePath('/dashboard');
   revalidatePath('/expenses');
+  revalidatePath('/reports');
   return { success: true };
 }
 
