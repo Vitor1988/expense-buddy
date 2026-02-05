@@ -1,6 +1,7 @@
 'use server';
 
 import { getAuthenticatedUser } from '@/lib/auth-helpers';
+import { createServiceClient } from '@/lib/supabase/service';
 import { revalidatePath } from 'next/cache';
 
 export async function getProfile() {
@@ -111,8 +112,17 @@ export async function deleteAccount() {
     return { error: deleteError.message };
   }
 
-  // Note: The user auth record itself would need admin privileges to delete
-  // For now, just sign out
+  // Delete the auth user record using service role
+  try {
+    const serviceClient = createServiceClient();
+    const { error: authDeleteError } = await serviceClient.auth.admin.deleteUser(user.id);
+    if (authDeleteError) {
+      console.error('Failed to delete auth user:', authDeleteError.message);
+    }
+  } catch (e) {
+    console.error('Service client error during account deletion:', e);
+  }
+
   await supabase.auth.signOut();
 
   return { success: true };

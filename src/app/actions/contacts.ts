@@ -284,15 +284,14 @@ export async function sendContactRequest(email: string): Promise<{ request?: Con
     return { error: 'You already have a pending request to this person' };
   }
 
-  // Check if the target user already exists by looking up auth users
-  const serviceClient = createServiceClient();
+  // Check if the target user already exists
   let targetUserId: string | null = null;
 
-  // Use admin API to find user by email
-  const { data: authUsers } = await serviceClient.auth.admin.listUsers();
-  const targetAuthUser = authUsers?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
-  if (targetAuthUser) {
-    targetUserId = targetAuthUser.id;
+  const { data: foundUserId } = await supabase.rpc('find_user_id_by_email', {
+    search_email: normalizedEmail,
+  });
+  if (foundUserId) {
+    targetUserId = foundUserId;
   }
 
   // Create the request

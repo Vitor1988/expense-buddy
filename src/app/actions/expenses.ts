@@ -254,6 +254,99 @@ export async function getExpenseById(id: string) {
   return { data, error: dbError?.message };
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformSharedToExpenses(sharedData: any[], userId: string): Expense[] {
+  return sharedData.map((se) => {
+    const userSplit = se.splits?.find((s: { user_id: string | null }) => s.user_id === userId);
+    const otherSplits = se.splits?.filter((s: { user_id: string | null }) => s.user_id !== userId) || [];
+
+    const pendingParticipants = otherSplits
+      .filter((s: { is_settled: boolean }) => !s.is_settled)
+      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown');
+    const settledParticipants = otherSplits
+      .filter((s: { is_settled: boolean }) => s.is_settled)
+      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown');
+
+    const participantNames = otherSplits
+      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown')
+      .join(', ');
+
+    return {
+      id: se.id,
+      user_id: userId,
+      category_id: null,
+      amount: userSplit?.amount || se.amount,
+      description: se.description ? `${se.description} (split with ${participantNames})` : `Split with ${participantNames}`,
+      notes: se.notes,
+      date: se.date,
+      receipt_url: se.receipt_url,
+      tags: [],
+      recurring_id: null,
+      created_at: se.created_at,
+      updated_at: se.created_at,
+      category: se.category
+        ? { id: 'shared', name: se.category, color: '#10b981', icon: '👥', is_default: false, user_id: userId, created_at: '' }
+        : { id: 'shared', name: 'Shared', color: '#10b981', icon: '👥', is_default: false, user_id: userId, created_at: '' },
+      pendingParticipants,
+      settledParticipants,
+      isSharedPayer: true,
+    };
+  }) as Expense[];
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformOwedToExpenses(owedData: any[], userId: string): Expense[] {
+  return owedData.map((split) => {
+    const se = split.shared_expense;
+    const payerData = Array.isArray(se.payer) ? se.payer[0] : se.payer;
+    const payerName = payerData?.full_name || 'Unknown';
+    const isSettled = split.is_settled;
+
+    const splitCategory = split.category as { id: string; name: string; color: string | null; icon: string | null } | null;
+    const hasUserCategory = isSettled && splitCategory;
+
+    let categoryObj;
+    if (hasUserCategory) {
+      categoryObj = {
+        id: splitCategory.id,
+        name: splitCategory.name,
+        color: splitCategory.color || '#10b981',
+        icon: splitCategory.icon || '✓',
+        is_default: false,
+        user_id: userId,
+        created_at: '',
+      };
+    } else if (isSettled) {
+      categoryObj = { id: 'settled', name: se.category || 'Shared', color: '#10b981', icon: '✓', is_default: false, user_id: userId, created_at: '' };
+    } else if (se.category) {
+      categoryObj = { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: userId, created_at: '' };
+    } else {
+      categoryObj = { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: userId, created_at: '' };
+    }
+
+    return {
+      id: se.id,
+      user_id: userId,
+      category_id: split.category_id || null,
+      amount: split.amount,
+      description: isSettled
+        ? (se.description || `Paid to ${payerName}`)
+        : (se.description ? `${se.description} (You owe ${payerName})` : `You owe ${payerName}`),
+      notes: null,
+      date: se.date,
+      receipt_url: null,
+      tags: [],
+      recurring_id: null,
+      created_at: se.date,
+      updated_at: se.date,
+      category: categoryObj,
+      splitId: split.id,
+      isSettled: isSettled,
+      owedTo: payerName,
+    };
+  }) as Expense[];
+}
+
 export async function getExpensesByMonth(monthCount: number = 3): Promise<{
   data: MonthlyExpenseData[] | null;
   error: string | null;
@@ -322,107 +415,8 @@ export async function getExpensesByMonth(monthCount: number = 3): Promise<{
 
   const expenses = expensesResult.data;
 
-  // Transform shared expenses to Expense-like format
-  const sharedAsExpenses = (sharedResult.data || []).map((se) => {
-    // Find user's own split to get their share
-    const userSplit = se.splits?.find((s: { user_id: string | null }) => s.user_id === user.id);
-    const otherSplits = se.splits?.filter((s: { user_id: string | null }) => s.user_id !== user.id) || [];
-
-    // Separate participants by settlement status
-    const pendingParticipants = otherSplits
-      .filter((s: { is_settled: boolean }) => !s.is_settled)
-      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown');
-    const settledParticipants = otherSplits
-      .filter((s: { is_settled: boolean }) => s.is_settled)
-      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown');
-
-    const participantNames = otherSplits
-      .map((s: { contact: { name: string } | null }) => s.contact?.name || 'Unknown')
-      .join(', ');
-
-    return {
-      id: se.id,
-      user_id: user.id,
-      category_id: null,
-      amount: userSplit?.amount || se.amount,
-      description: se.description ? `${se.description} (split with ${participantNames})` : `Split with ${participantNames}`,
-      notes: se.notes,
-      date: se.date,
-      receipt_url: se.receipt_url,
-      tags: [],
-      recurring_id: null,
-      created_at: se.created_at,
-      updated_at: se.created_at,
-      // Category based on shared_expense.category field or default
-      category: se.category
-        ? { id: 'shared', name: se.category, color: '#10b981', icon: '👥', is_default: false, user_id: user.id, created_at: '' }
-        : { id: 'shared', name: 'Shared', color: '#10b981', icon: '👥', is_default: false, user_id: user.id, created_at: '' },
-      // Add settlement status for payer view
-      pendingParticipants,
-      settledParticipants,
-      isSharedPayer: true,
-    };
-  }) as Expense[];
-
-  // Transform owed splits (where user owes money) to Expense-like format
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const owedAsExpenses = (owedResult.data || []).map((split: any) => {
-    const se = split.shared_expense;
-    const payerData = Array.isArray(se.payer) ? se.payer[0] : se.payer;
-    const payerName = payerData?.full_name || 'Unknown';
-    const isSettled = split.is_settled;
-
-    // Use split's category if settled and has one, otherwise use original category
-    const splitCategory = split.category as { id: string; name: string; color: string | null; icon: string | null } | null;
-    const hasUserCategory = isSettled && splitCategory;
-
-    // Build category object
-    let categoryObj;
-    if (hasUserCategory) {
-      // Use user's chosen category when settling
-      categoryObj = {
-        id: splitCategory.id,
-        name: splitCategory.name,
-        color: splitCategory.color || '#10b981',
-        icon: splitCategory.icon || '✓',
-        is_default: false,
-        user_id: user.id,
-        created_at: '',
-      };
-    } else if (isSettled) {
-      // Settled but no user category (legacy data)
-      categoryObj = { id: 'settled', name: se.category || 'Shared', color: '#10b981', icon: '✓', is_default: false, user_id: user.id, created_at: '' };
-    } else if (se.category) {
-      // Not settled, has original category
-      categoryObj = { id: 'owed', name: se.category, color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' };
-    } else {
-      // Not settled, no category
-      categoryObj = { id: 'owed', name: 'Owed', color: '#f59e0b', icon: '💸', is_default: false, user_id: user.id, created_at: '' };
-    }
-
-    // If settled, show as normal expense; if not settled, show "You owe" styling
-    return {
-      id: se.id,
-      user_id: user.id,
-      category_id: split.category_id || null,
-      amount: split.amount,
-      description: isSettled
-        ? (se.description || `Paid to ${payerName}`)
-        : (se.description ? `${se.description} (You owe ${payerName})` : `You owe ${payerName}`),
-      notes: null,
-      date: se.date,
-      receipt_url: null,
-      tags: [],
-      recurring_id: null,
-      created_at: se.date,
-      updated_at: se.date,
-      category: categoryObj,
-      // Include split data for settling
-      splitId: split.id,
-      isSettled: isSettled,
-      owedTo: payerName,
-    };
-  }) as Expense[];
+  const sharedAsExpenses = transformSharedToExpenses(sharedResult.data || [], user.id);
+  const owedAsExpenses = transformOwedToExpenses(owedResult.data || [], user.id);
 
   // Combine and sort by date
   const allExpenses = [...(expenses || []), ...sharedAsExpenses, ...owedAsExpenses].sort(
@@ -513,18 +507,63 @@ export async function loadMoreMonths(offset: number, count: number = 3): Promise
   const { start: startDate } = getMonthDateRange(oldestMonth);
   const { end: endDate } = getMonthDateRange(newestMonth);
 
-  // Fetch expenses for the date range
-  const { data: expenses, error: expensesError } = await supabase
-    .from('expenses')
-    .select('*, category:categories(*)')
-    .eq('user_id', user.id)
-    .gte('date', startDate)
-    .lte('date', endDate)
-    .order('date', { ascending: false });
+  // Fetch all expense types for the date range
+  const [expensesResult, sharedResult, owedResult] = await Promise.all([
+    supabase
+      .from('expenses')
+      .select('*, category:categories(*)')
+      .eq('user_id', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: false }),
+    supabase
+      .from('shared_expenses')
+      .select(`
+        *,
+        splits:expense_splits(
+          user_id,
+          amount,
+          is_settled,
+          contact:contacts(name)
+        )
+      `)
+      .is('group_id', null)
+      .eq('paid_by', user.id)
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: false }),
+    supabase
+      .from('expense_splits')
+      .select(`
+        id,
+        user_id,
+        amount,
+        is_settled,
+        category_id,
+        category:categories(id, name, color, icon),
+        shared_expense:shared_expenses!inner(
+          id, amount, description, category, date, paid_by,
+          payer:profiles!paid_by(id, full_name)
+        )
+      `)
+      .is('shared_expense.group_id', null)
+      .eq('user_id', user.id)
+      .neq('shared_expense.paid_by', user.id)
+      .is('dismissed_at', null)
+      .gte('shared_expense.date', startDate)
+      .lte('shared_expense.date', endDate),
+  ]);
 
-  if (expensesError) {
-    return { data: null, error: expensesError.message };
+  if (expensesResult.error) {
+    return { data: null, error: expensesResult.error.message };
   }
+
+  const sharedAsExpenses = transformSharedToExpenses(sharedResult.data || [], user.id);
+  const owedAsExpenses = transformOwedToExpenses(owedResult.data || [], user.id);
+
+  const allExpenses = [...(expensesResult.data || []), ...sharedAsExpenses, ...owedAsExpenses].sort(
+    (a, b) => b.date.localeCompare(a.date)
+  );
 
   // Fetch monthly budgets
   const { data: budgets } = await supabase
@@ -535,11 +574,11 @@ export async function loadMoreMonths(offset: number, count: number = 3): Promise
 
   const totalBudget = budgets?.reduce((sum, b) => sum + Number(b.amount), 0) || 0;
 
-  // Group expenses by month (same logic as above)
+  // Group expenses by month
   const monthlyData: MonthlyExpenseData[] = monthKeys.map((monthKey) => {
     const { start, end } = getMonthDateRange(monthKey);
 
-    const monthExpenses = (expenses || []).filter((exp) => {
+    const monthExpenses = allExpenses.filter((exp) => {
       return exp.date >= start && exp.date <= end;
     }) as Expense[];
 
