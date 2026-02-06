@@ -3,21 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import {
-  LayoutDashboard,
-  Receipt,
-  BarChart3,
-  Plus,
-  Users,
-} from 'lucide-react';
-
-const navItems = [
-  { href: '/dashboard', label: 'Home', icon: LayoutDashboard },
-  { href: '/expenses', label: 'Expenses', icon: Receipt },
-  { href: '/expenses/new', label: 'Add', icon: Plus, isAction: true },
-  { href: '/groups', label: 'Groups', icon: Users },
-  { href: '/reports', label: 'Reports', icon: BarChart3 },
-];
+import { bottomNavItems } from '@/lib/navigation-config';
 
 export function BottomNav() {
   const pathname = usePathname();
@@ -25,7 +11,7 @@ export function BottomNav() {
   return (
     <nav role="navigation" aria-label="Mobile navigation" className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-900 border-t border-gray-200 dark:border-gray-800 z-50 pb-safe">
       <div className="flex items-center justify-around py-2">
-        {navItems.map((item) => {
+        {bottomNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href ||
             (item.href !== '/expenses/new' && pathname.startsWith(item.href + '/'));

@@ -229,7 +229,6 @@ export async function processRecurringExpenses() {
     });
 
     if (insertError) {
-      console.error('Failed to create recurring expense:', insertError.message);
       continue;
     }
 

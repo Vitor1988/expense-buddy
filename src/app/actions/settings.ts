@@ -75,9 +75,13 @@ export async function updatePassword(formData: FormData) {
     return { error: 'Password must be at least 6 characters' };
   }
 
+  if (!user.email) {
+    return { error: 'Email not found' };
+  }
+
   // Verify current password by signing in
   const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: user.email!,
+    email: user.email,
     password: currentPassword,
   });
 
@@ -117,10 +121,10 @@ export async function deleteAccount() {
     const serviceClient = createServiceClient();
     const { error: authDeleteError } = await serviceClient.auth.admin.deleteUser(user.id);
     if (authDeleteError) {
-      console.error('Failed to delete auth user:', authDeleteError.message);
+      // Auth user deletion failed but profile is already deleted
     }
-  } catch (e) {
-    console.error('Service client error during account deletion:', e);
+  } catch {
+    // Service client error during account deletion - profile is already deleted
   }
 
   await supabase.auth.signOut();

@@ -464,7 +464,6 @@ export async function acceptContactRequest(requestId: string): Promise<{ error?:
 
     // Ignore duplicate key errors (23505) - contact already exists
     if (contactError && contactError.code !== '23505') {
-      console.error('Failed to create contact:', contactError);
       return { error: 'Failed to create contacts: ' + contactError.message };
     }
   }

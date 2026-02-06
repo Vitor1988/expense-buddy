@@ -51,8 +51,7 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
     });
 
     if (profileError) {
-      console.error('Profile creation failed:', profileError.message);
-      // Continue anyway - user can still use the app, profile will be created on first access
+      // Profile creation failed - user can still use the app, profile will be created on first access
     }
 
     // Create default categories for the user
@@ -69,17 +68,15 @@ export async function signUp(formData: FormData): Promise<AuthResult> {
 
     const { error: categoriesError } = await supabase.from('categories').insert(defaultCategories);
     if (categoriesError) {
-      console.error('Default categories creation failed:', categoriesError.message);
-      // Continue anyway - user can create categories manually
+      // Default categories creation failed - user can create categories manually
     }
 
     // Link any contacts that were created with this user's email before they registered
     // This enables bidirectional visibility for shared expenses
     try {
       await linkContactsByEmail(data.user.id, email);
-    } catch (e) {
-      console.error('Failed to link contacts:', e);
-      // Continue with signup - linking is not critical
+    } catch {
+      // Contact linking failed - not critical for auth flow
     }
 
     // Check if email confirmation is required
@@ -117,9 +114,8 @@ export async function signIn(formData: FormData): Promise<AuthResult> {
   if (data.user) {
     try {
       await linkContactsByEmail(data.user.id, email);
-    } catch (e) {
-      console.error('Failed to link contacts:', e);
-      // Continue with login - linking is not critical
+    } catch {
+      // Contact linking failed - not critical for auth flow
     }
   }
 

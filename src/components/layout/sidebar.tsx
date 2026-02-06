@@ -3,30 +3,8 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import {
-  LayoutDashboard,
-  Receipt,
-  PiggyBank,
-  BarChart3,
-  Settings,
-  Repeat,
-  Wallet,
-  FolderOpen,
-  Users,
-  UserPlus,
-} from 'lucide-react';
-
-const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/expenses', label: 'Expenses', icon: Receipt },
-  { href: '/groups', label: 'Groups', icon: Users },
-  { href: '/contacts', label: 'Contacts', icon: UserPlus },
-  { href: '/categories', label: 'Categories', icon: FolderOpen },
-  { href: '/budgets', label: 'Budgets', icon: PiggyBank },
-  { href: '/recurring', label: 'Recurring', icon: Repeat },
-  { href: '/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/settings', label: 'Settings', icon: Settings },
-];
+import { Wallet } from 'lucide-react';
+import { sidebarNavItems } from '@/lib/navigation-config';
 
 export function Sidebar() {
   const pathname = usePathname();
@@ -45,7 +23,7 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-        {navItems.map((item) => {
+        {sidebarNavItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
 

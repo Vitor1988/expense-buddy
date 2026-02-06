@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Search, X, SlidersHorizontal, ArrowUpDown } from 'lucide-react';
 import { type Category } from '@/types';
-import { useCallback, useRef, useMemo } from 'react';
+import { useCallback, useRef, useMemo, useEffect } from 'react';
 
 interface ExpenseFiltersProps {
   categories: Category[];
@@ -33,6 +33,13 @@ export function ExpenseFilters({ categories, currency: _currency = 'EUR' }: Expe
   const searchParams = useSearchParams();
   const searchTimeoutRef = useRef<NodeJS.Timeout>();
   const amountTimeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
+      if (amountTimeoutRef.current) clearTimeout(amountTimeoutRef.current);
+    };
+  }, []);
 
   const updateFilters = useCallback(
     (key: string, value: string | null) => {

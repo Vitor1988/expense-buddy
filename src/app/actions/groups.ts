@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type { ExpenseGroup, GroupMember, SharedExpense, ExpenseSplit, GroupBalance, SplitMethod } from '@/types';
 import { calculateSplits, type SplitInput } from '@/lib/split-calculator';
+import { validateEmail } from '@/lib/validations';
 import { syncContactsForGroupMember } from './contacts';
 
 // ============ GROUP CRUD ============
@@ -279,6 +280,11 @@ export async function createSharedExpense(groupId: string, formData: FormData) {
   const notes = formData.get('notes') as string;
   const splitMembersJson = formData.get('split_members') as string;
 
+  const validSplitMethods = ['equal', 'exact', 'percentage', 'shares'];
+  if (!validSplitMethods.includes(split_method)) {
+    return { error: 'Invalid split method' };
+  }
+
   if (!amount || isNaN(amount) || amount <= 0) {
     return { error: 'Please enter a valid amount' };
   }
@@ -412,6 +418,11 @@ export async function updateSharedExpense(expenseId: string, formData: FormData)
   const date = formData.get('date') as string;
   const paid_by = formData.get('paid_by') as string;
   const split_method = (formData.get('split_method') as string) || 'equal';
+
+  const validSplitMethods = ['equal', 'exact', 'percentage', 'shares'];
+  if (!validSplitMethods.includes(split_method)) {
+    return { error: 'Invalid split method' };
+  }
   const notes = formData.get('notes') as string;
   const splitMembersJson = formData.get('split_members') as string;
 
@@ -873,9 +884,8 @@ export async function sendInvitation(groupId: string, email: string) {
     return { error: 'Only admins can invite members' };
   }
 
-  // Validate email (HTML5 email validation pattern)
-  const emailRegex = /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
-  if (!emailRegex.test(email)) {
+  // Validate email
+  if (!validateEmail(email)) {
     return { error: 'Please enter a valid email address' };
   }
 
@@ -1046,9 +1056,6 @@ export async function acceptInvitation(token: string) {
 export async function declineInvitation(token: string) {
   const supabase = await createClient();
 
-  // Get current user (optional - token is already secret, but good for logging)
-  const { data: { user } } = await supabase.auth.getUser();
-
   const { data: invitation, error: inviteError } = await supabase
     .from('group_invitations')
     .select('id, status, invited_email')
@@ -1061,11 +1068,6 @@ export async function declineInvitation(token: string) {
 
   if (invitation.status !== 'pending') {
     return { error: `This invitation has already been ${invitation.status}` };
-  }
-
-  // Log for audit purposes (optional security measure)
-  if (user) {
-    console.log(`User ${user.id} declined invitation for ${invitation.invited_email}`);
   }
 
   const { error } = await supabase

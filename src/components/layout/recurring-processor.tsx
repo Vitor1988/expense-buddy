@@ -10,8 +10,8 @@ export function RecurringProcessor() {
     if (hasProcessed.current) return;
     hasProcessed.current = true;
 
-    processRecurringExpenses().catch(err => {
-      console.error('Failed to process recurring expenses:', err);
+    processRecurringExpenses().catch(() => {
+      // Recurring expense processing failed silently
     });
   }, []);
 

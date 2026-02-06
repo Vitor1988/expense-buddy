@@ -914,11 +914,21 @@ export async function createInlineSharedExpense(formData: FormData) {
 
   // Parse participants (contact IDs)
   const participantsJson = formData.get('participants') as string;
-  const participantIds: string[] = participantsJson ? JSON.parse(participantsJson) : [];
+  let participantIds: string[] = [];
+  try {
+    participantIds = participantsJson ? JSON.parse(participantsJson) : [];
+  } catch {
+    return { error: 'Invalid participants data' };
+  }
 
   // Parse split values (for exact/percentage/shares methods)
   const splitValuesJson = formData.get('split_values') as string;
-  const splitValues: Record<string, number> = splitValuesJson ? JSON.parse(splitValuesJson) : {};
+  let splitValues: Record<string, number> = {};
+  try {
+    splitValues = splitValuesJson ? JSON.parse(splitValuesJson) : {};
+  } catch {
+    return { error: 'Invalid split values data' };
+  }
 
   if (!amount || isNaN(amount) || amount <= 0) {
     return { error: 'Please enter a valid amount' };
