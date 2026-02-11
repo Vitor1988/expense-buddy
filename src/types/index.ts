@@ -60,6 +60,10 @@ export interface RecurringExpense {
   frequency: 'daily' | 'weekly' | 'monthly' | 'yearly';
   next_date: string;
   is_active: boolean;
+  is_shared: boolean;
+  split_method: SplitMethod;
+  participants: string[] | null;
+  split_values: Record<string, number> | null;
   created_at: string;
   category?: Category;
 }
@@ -113,6 +117,7 @@ export interface SharedExpense {
   split_method: SplitMethod;
   receipt_url: string | null;
   notes: string | null;
+  recurring_id: string | null;
   created_at: string;
   payer?: Profile;
   splits?: ExpenseSplit[];

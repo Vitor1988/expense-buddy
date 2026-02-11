@@ -16,6 +16,10 @@ interface SplitToggleProps {
   amount: number;
   currency: string;
   onSplitDataChange: (data: SplitData | null) => void;
+  initialEnabled?: boolean;
+  initialParticipants?: string[];
+  initialSplitMethod?: SplitMethod;
+  initialSplitValues?: Record<string, number>;
 }
 
 export interface SplitData {
@@ -26,16 +30,24 @@ export interface SplitData {
   preview: SplitResult[];
 }
 
-export function SplitToggle({ amount, currency, onSplitDataChange }: SplitToggleProps) {
-  const [enabled, setEnabled] = useState(false);
-  const [selectedParticipants, setSelectedParticipants] = useState<string[]>([]);
-  const [splitMethod, setSplitMethod] = useState<SplitMethod>('equal');
+export function SplitToggle({ amount, currency, onSplitDataChange, initialEnabled, initialParticipants, initialSplitMethod, initialSplitValues }: SplitToggleProps) {
+  const [enabled, setEnabled] = useState(initialEnabled ?? false);
+  const [selectedParticipants, setSelectedParticipants] = useState<string[]>(initialParticipants ?? []);
+  const [splitMethod, setSplitMethod] = useState<SplitMethod>(initialSplitMethod ?? 'equal');
   const [contacts, setContacts] = useState<Contact[]>([]);
 
   // Split input values (for exact, percentage, shares)
-  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>({});
-  const [percentages, setPercentages] = useState<Record<string, string>>({});
-  const [shares, setShares] = useState<Record<string, string>>({});
+  const buildInitialValues = (method: string): Record<string, string> => {
+    if (!initialSplitValues || !initialSplitMethod || initialSplitMethod !== method) return {};
+    const result: Record<string, string> = {};
+    for (const [key, val] of Object.entries(initialSplitValues)) {
+      result[key] = String(val);
+    }
+    return result;
+  };
+  const [exactAmounts, setExactAmounts] = useState<Record<string, string>>(() => buildInitialValues('exact'));
+  const [percentages, setPercentages] = useState<Record<string, string>>(() => buildInitialValues('percentage'));
+  const [shares, setShares] = useState<Record<string, string>>(() => buildInitialValues('shares'));
 
   const [splitPreview, setSplitPreview] = useState<SplitResult[]>([]);
   const [splitError, setSplitError] = useState<string | null>(null);

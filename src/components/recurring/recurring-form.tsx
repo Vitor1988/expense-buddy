@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useCallback } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,6 +19,7 @@ import {
 } from '@/components/ui/dialog';
 import { FormSubmitButton, CurrencyInput, CategorySelect } from '@/components/shared';
 import { type Category, type RecurringExpense } from '@/types';
+import { SplitToggle, type SplitData } from '@/components/expenses/split-toggle';
 
 interface RecurringFormProps {
   categories: Category[];
@@ -30,11 +32,30 @@ interface RecurringFormProps {
 
 export function RecurringForm({ categories, recurring, action, open, onOpenChange, currency = 'USD' }: RecurringFormProps) {
   const { toast } = useToast();
+  const [amount, setAmount] = useState<number>(recurring?.amount || 0);
+  const [splitData, setSplitData] = useState<SplitData | null>(null);
+
+  const handleAmountChange = useCallback((value: number) => {
+    setAmount(value);
+  }, []);
+
+  const handleSplitDataChange = useCallback((data: SplitData | null) => {
+    setSplitData(data);
+  }, []);
 
   const handleSubmit = async (formData: FormData) => {
     if (recurring) {
       formData.set('is_active', recurring.is_active ? 'true' : 'false');
     }
+
+    // Add split data to FormData
+    if (splitData?.enabled && splitData.participants.length > 0) {
+      formData.set('is_shared', 'true');
+      formData.set('participants', JSON.stringify(splitData.participants));
+      formData.set('split_method', splitData.splitMethod);
+      formData.set('split_values', JSON.stringify(splitData.splitValues));
+    }
+
     const result = await action(formData);
     if (result?.success) {
       onOpenChange(false);
@@ -53,7 +74,7 @@ export function RecurringForm({ categories, recurring, action, open, onOpenChang
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{recurring ? 'Edit Recurring Expense' : 'New Recurring Expense'}</DialogTitle>
         </DialogHeader>
@@ -65,6 +86,7 @@ export function RecurringForm({ categories, recurring, action, open, onOpenChang
             currency={currency}
             defaultValue={recurring?.amount}
             required
+            onChange={handleAmountChange}
           />
 
           {/* Description */}
@@ -113,6 +135,17 @@ export function RecurringForm({ categories, recurring, action, open, onOpenChang
               required
             />
           </div>
+
+          {/* Split Toggle */}
+          <SplitToggle
+            amount={amount}
+            currency={currency}
+            onSplitDataChange={handleSplitDataChange}
+            initialEnabled={recurring?.is_shared}
+            initialParticipants={recurring?.participants ?? undefined}
+            initialSplitMethod={recurring?.split_method}
+            initialSplitValues={recurring?.split_values ?? undefined}
+          />
 
           <FormSubmitButton
             className="w-full bg-emerald-500 hover:bg-emerald-600"

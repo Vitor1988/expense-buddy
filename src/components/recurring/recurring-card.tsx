@@ -5,7 +5,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Card, CardContent } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, RefreshCw } from 'lucide-react';
+import { Calendar, RefreshCw, Users } from 'lucide-react';
 import { CardActionMenu, DeleteConfirmationDialog } from '@/components/shared';
 import { useDeleteAction } from '@/hooks/use-delete-action';
 import { type Category, type RecurringExpense } from '@/types';
@@ -83,6 +83,12 @@ export function RecurringCard({ recurring, categories, currency = 'USD', onToggl
                   <Badge variant={recurring.is_active ? 'default' : 'secondary'}>
                     {recurring.is_active ? 'Active' : 'Paused'}
                   </Badge>
+                  {recurring.is_shared && (
+                    <Badge variant="outline" className="gap-1">
+                      <Users className="w-3 h-3" />
+                      Split {recurring.participants?.length ? `(${recurring.participants.length + 1})` : ''}
+                    </Badge>
+                  )}
                 </div>
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   {category?.name || 'Uncategorized'}

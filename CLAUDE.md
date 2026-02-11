@@ -132,6 +132,31 @@ npm run start    # Start production server
 npm run lint     # Run ESLint
 ```
 
+## Database Migrations (Supabase CLI)
+
+The project is linked to the remote Supabase instance via `npx supabase` (CLI available through npx).
+
+```bash
+# Check linked project
+npx supabase projects list
+
+# Preview pending migrations (safe, no changes)
+npx supabase db push --linked --dry-run
+
+# Apply pending migrations to remote database
+npx supabase db push --linked
+
+# Backup remote schema (requires Docker)
+npx supabase db dump --linked -f backups/schema_backup.sql
+
+# Backup remote data only (requires Docker)
+npx supabase db dump --linked --data-only -f backups/data_backup.sql
+```
+
+**Migration file naming**: `<YYYYMMDDHHMMSS>_description.sql` (e.g., `20260210100000_recurring_shared_expenses.sql`)
+
+**Location**: `supabase/migrations/`
+
 ## Features
 
 - Expense tracking with categories and tags
