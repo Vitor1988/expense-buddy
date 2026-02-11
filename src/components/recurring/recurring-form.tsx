@@ -56,13 +56,21 @@ export function RecurringForm({ categories, recurring, action, open, onOpenChang
       formData.set('split_values', JSON.stringify(splitData.splitValues));
     }
 
-    const result = await action(formData);
-    if (result?.success) {
-      onOpenChange(false);
-    } else if (result?.error) {
+    try {
+      const result = await action(formData);
+      if (result?.success) {
+        onOpenChange(false);
+      } else if (result?.error) {
+        toast({
+          title: 'Error',
+          description: result.error,
+          variant: 'destructive',
+        });
+      }
+    } catch {
       toast({
         title: 'Error',
-        description: result.error,
+        description: 'An unexpected error occurred',
         variant: 'destructive',
       });
     }

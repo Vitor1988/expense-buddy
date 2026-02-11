@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache';
 import { calculateSplits, type SplitInput } from '@/lib/split-calculator';
 import { validateEnum } from '@/lib/validations';
 import type { SplitMethod } from '@/types';
+import type { SupabaseClient } from '@supabase/supabase-js';
 
 const VALID_SPLIT_METHODS = ['equal', 'exact', 'percentage', 'shares'] as const;
 const VALID_FREQUENCIES = ['daily', 'weekly', 'monthly', 'yearly'] as const;
@@ -75,7 +76,7 @@ function parseSharedFields(formData: FormData) {
 
 /** Create a shared expense entry from a recurring expense template */
 async function createSharedExpenseFromRecurring(
-  supabase: ReturnType<typeof Object>,
+  supabase: SupabaseClient,
   userId: string,
   recurring: {
     id: string;
@@ -88,13 +89,10 @@ async function createSharedExpenseFromRecurring(
     next_date: string;
   }
 ): Promise<{ error?: string }> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const sb = supabase as any;
-
   // Get category name for backwards compatibility
   let categoryName: string | null = null;
   if (recurring.category_id) {
-    const { data: category } = await sb
+    const { data: category } = await supabase
       .from('categories')
       .select('name')
       .eq('id', recurring.category_id)
@@ -103,7 +101,7 @@ async function createSharedExpenseFromRecurring(
   }
 
   // Fetch approved contacts that are still valid
-  const { data: contacts } = await sb
+  const { data: contacts } = await supabase
     .from('contacts')
     .select('id, name, profile_id, is_approved')
     .in('id', recurring.participants)
@@ -111,18 +109,9 @@ async function createSharedExpenseFromRecurring(
 
   const validContacts = contacts || [];
 
-  // If no valid contacts remain, fall back to personal expense
+  // If no valid contacts remain, return error instead of silently falling back
   if (validContacts.length === 0) {
-    await sb.from('expenses').insert({
-      user_id: userId,
-      amount: recurring.amount,
-      description: recurring.description,
-      category_id: recurring.category_id,
-      date: recurring.next_date,
-      recurring_id: recurring.id,
-      tags: [],
-    });
-    return {};
+    return { error: 'No valid contacts found. Contacts may have been removed or unapproved.' };
   }
 
   // Build participant IDs (self + valid contacts)
@@ -166,7 +155,7 @@ async function createSharedExpenseFromRecurring(
   }
 
   // Create shared expense
-  const { data: sharedExpense, error: expenseError } = await sb
+  const { data: sharedExpense, error: expenseError } = await supabase
     .from('shared_expenses')
     .insert({
       group_id: null,
@@ -224,13 +213,13 @@ async function createSharedExpenseFromRecurring(
     }
   });
 
-  const { error: splitsError } = await sb
+  const { error: splitsError } = await supabase
     .from('expense_splits')
     .insert(splitsToInsert);
 
   if (splitsError) {
     // Rollback shared expense
-    await sb.from('shared_expenses').delete().eq('id', sharedExpense.id);
+    await supabase.from('shared_expenses').delete().eq('id', sharedExpense.id);
     return { error: splitsError.message };
   }
 
@@ -321,16 +310,23 @@ export async function createRecurringExpense(formData: FormData) {
   const today = new Date().toISOString().split('T')[0];
   if (next_date <= today) {
     if (shared.is_shared && shared.participants) {
-      await createSharedExpenseFromRecurring(supabase, user.id, {
-        id: inserted.id,
-        amount,
-        description: description || null,
-        category_id: category_id || null,
-        split_method: shared.split_method,
-        participants: shared.participants,
-        split_values: shared.split_values,
-        next_date,
-      });
+      try {
+        const result = await createSharedExpenseFromRecurring(supabase, user.id, {
+          id: inserted.id,
+          amount,
+          description: description || null,
+          category_id: category_id || null,
+          split_method: shared.split_method,
+          participants: shared.participants,
+          split_values: shared.split_values,
+          next_date,
+        });
+        if (result.error) {
+          return { error: `Failed to create shared expense: ${result.error}` };
+        }
+      } catch (err) {
+        return { error: `Failed to create shared expense: ${err instanceof Error ? err.message : 'Unknown error'}` };
+      }
     } else {
       await supabase.from('expenses').insert({
         user_id: user.id,
@@ -486,18 +482,22 @@ export async function processRecurringExpenses() {
         continue;
       }
 
-      const result = await createSharedExpenseFromRecurring(supabase, user.id, {
-        id: recurring.id,
-        amount: recurring.amount,
-        description: recurring.description,
-        category_id: recurring.category_id,
-        split_method: recurring.split_method || 'equal',
-        participants: recurring.participants,
-        split_values: recurring.split_values,
-        next_date: recurring.next_date,
-      });
+      try {
+        const result = await createSharedExpenseFromRecurring(supabase, user.id, {
+          id: recurring.id,
+          amount: recurring.amount,
+          description: recurring.description,
+          category_id: recurring.category_id,
+          split_method: recurring.split_method || 'equal',
+          participants: recurring.participants,
+          split_values: recurring.split_values,
+          next_date: recurring.next_date,
+        });
 
-      if (result.error) {
+        if (result.error) {
+          continue;
+        }
+      } catch {
         continue;
       }
     } else {
